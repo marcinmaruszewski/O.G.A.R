@@ -1,4 +1,10 @@
 
+# Node / build artifacts
+node_modules/
+dist/
+out/
+coverage/
+
 # Beads / Dolt files (added by bd init)
 .dolt/
 *.db
