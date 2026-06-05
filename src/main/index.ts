@@ -1,7 +1,8 @@
 import { join } from "node:path";
-import { BrowserWindow, app, ipcMain } from "electron";
+import { BrowserWindow, app, ipcMain, safeStorage } from "electron";
 import { openDatabase } from "./db/database.js";
 import { registerIpcHandlers } from "./ipc.js";
+import type { SafeStorageAdapter } from "./settings/secret-store.js";
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -31,7 +32,8 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   const db = openDatabase(join(app.getPath("userData"), "ogar.db"));
-  registerIpcHandlers(ipcMain, db);
+  const crypto: SafeStorageAdapter = safeStorage;
+  registerIpcHandlers(ipcMain, db, crypto);
 
   createWindow();
 

@@ -12,9 +12,17 @@ export interface AppInfo {
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
+  getSetting: "settings:get",
+  setSetting: "settings:set",
+  getSecret: "secrets:get",
+  setSecret: "secrets:set",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
 export interface OgarApi {
   getAppInfo(): Promise<AppInfo>;
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<void>;
+  getSecret(key: string): Promise<string | null>;
+  setSecret(key: string, value: string): Promise<void>;
 }

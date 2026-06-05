@@ -13,4 +13,18 @@ export const migrations: Migration[] = [
       db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run("app_name", "O.G.A.R.");
     },
   },
+  {
+    version: 2,
+    name: "settings",
+    up: (db) => {
+      db.exec("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+    },
+  },
+  {
+    version: 3,
+    name: "secrets",
+    up: (db) => {
+      db.exec("CREATE TABLE secrets (key TEXT PRIMARY KEY, encrypted_value BLOB NOT NULL)");
+    },
+  },
 ];
