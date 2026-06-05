@@ -1,0 +1,29 @@
+appId: me.marcinmaruszewski.ogar
+productName: O.G.A.R.
+copyright: Copyright © 2026 Marcin Maruszewski
+
+directories:
+  output: dist
+
+# Native modules (.node files) cannot live inside an .asar archive — extract them.
+asar: true
+asarUnpack:
+  - "**/*.node"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  runAfterFinish: false
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64

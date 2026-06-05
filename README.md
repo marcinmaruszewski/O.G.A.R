@@ -30,6 +30,22 @@ npm run dev          # launch the app in dev (see native-module note below)
 npm run build        # bundle main, preload, renderer into ./out
 ```
 
+## Packaging
+
+```bash
+npm run dist:win    # NSIS .exe (Windows only — run on Windows or cross-compile)
+npm run dist:linux  # AppImage (Linux/WSL)
+npm run dist        # default target for current OS
+```
+
+The Electron version is pinned at `33.4.11`. `electron-builder` rebuilds
+`better-sqlite3` against the pinned Electron ABI automatically during packaging,
+so you do **not** need to run `rebuild:electron` manually before `dist`.
+
+**Windows verification (HITL):** After `npm run dist:win`, install the produced
+`.exe` on a Windows machine, launch the app, and confirm it opens and reads from
+SQLite (the window should show "O.G.A.R." and "schema version 1").
+
 ## Native module: better-sqlite3 ABI
 
 `better-sqlite3` is a V8-ABI native module, so its compiled binary must match the

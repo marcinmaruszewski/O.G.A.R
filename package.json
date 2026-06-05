@@ -2,6 +2,7 @@
   "name": "ogar",
   "version": "0.0.0",
   "description": "O.G.A.R. — Personal Dev-Productivity Hub & Tempo Worklog Assistant",
+  "author": "Marcin Maruszewski <kontakt@marcinmaruszewski.me>",
   "private": true,
   "type": "module",
   "main": "./out/main/index.js",
@@ -13,7 +14,10 @@
     "rebuild:node": "npm rebuild better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dist": "electron-vite build && electron-builder",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:linux": "electron-vite build && electron-builder --linux"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
@@ -23,7 +27,8 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.5.0",
-    "electron": "^33.4.11",
+    "electron": "33.4.11",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^2.3.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
