@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { IPC } from "../shared/ipc.js";
 import { readAppInfo } from "./db/database.js";
+import { fetchMyOpenSprintTickets } from "./jira/jira.js";
 import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js";
 import { getSetting, setSetting } from "./settings/settings.js";
 
@@ -11,7 +12,8 @@ export interface IpcRegistrar {
 export function registerIpcHandlers(
   ipc: IpcRegistrar,
   db: Database.Database,
-  crypto: SafeStorageAdapter
+  crypto: SafeStorageAdapter,
+  fetcher?: typeof fetch
 ): void {
   const secrets = new SecretStore(db, crypto);
 
@@ -20,4 +22,13 @@ export function registerIpcHandlers(
   ipc.handle(IPC.setSetting, (_e, ...args) => setSetting(db, args[0] as string, args[1] as string));
   ipc.handle(IPC.getSecret, (_e, ...args) => secrets.get(args[0] as string));
   ipc.handle(IPC.setSecret, (_e, ...args) => secrets.set(args[0] as string, args[1] as string));
+  ipc.handle(IPC.getMyOpenTickets, async () => {
+    const baseUrl = getSetting(db, "jiraBaseUrl");
+    const email = secrets.get("jiraEmail");
+    const token = secrets.get("jiraToken");
+    if (!baseUrl || !email || !token) {
+      throw new Error("Jira is not configured — set jiraBaseUrl, jiraEmail, and jiraToken in settings");
+    }
+    return fetchMyOpenSprintTickets(baseUrl, email, token, db, fetcher);
+  });
 }

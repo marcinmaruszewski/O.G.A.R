@@ -27,4 +27,13 @@ export const migrations: Migration[] = [
       db.exec("CREATE TABLE secrets (key TEXT PRIMARY KEY, encrypted_value BLOB NOT NULL)");
     },
   },
+  {
+    version: 4,
+    name: "ticket_cache",
+    up: (db) => {
+      db.exec(
+        "CREATE TABLE ticket_cache (key TEXT PRIMARY KEY, issue_id TEXT NOT NULL, summary TEXT NOT NULL)"
+      );
+    },
+  },
 ];

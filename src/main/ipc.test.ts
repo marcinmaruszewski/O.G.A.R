@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC } from "../shared/ipc.js";
 import { openDatabase } from "./db/database.js";
 import { registerIpcHandlers, type IpcRegistrar } from "./ipc.js";
@@ -40,7 +40,7 @@ describe("registerIpcHandlers", () => {
 
     const handler = handlers.get(IPC.getAppInfo);
     expect(handler).toBeDefined();
-    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 3 });
+    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 4 });
     db.close();
   });
 
@@ -61,6 +61,33 @@ describe("registerIpcHandlers", () => {
     handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-xyz");
     const result = handlers.get(IPC.getSecret)!(_event, "jiraToken");
     expect(result).toBe("tok-xyz");
+    db.close();
+  });
+
+  it("jira:getMyOpenTickets handler returns tickets from Jira", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          issues: [
+            { key: "PROJ-1", id: "10001", fields: { summary: "Fix login bug" } },
+          ],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    // Store credentials via IPC handlers
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+
+    const handler = handlers.get(IPC.getMyOpenTickets);
+    expect(handler).toBeDefined();
+    const result = await handler!(_event);
+    expect(result).toEqual([{ key: "PROJ-1", id: "10001", summary: "Fix login bug" }]);
     db.close();
   });
 });

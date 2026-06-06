@@ -9,6 +9,12 @@ export interface AppInfo {
   schemaVersion: number;
 }
 
+export interface JiraTicket {
+  key: string;
+  id: string;
+  summary: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -16,6 +22,7 @@ export const IPC = {
   setSetting: "settings:set",
   getSecret: "secrets:get",
   setSecret: "secrets:set",
+  getMyOpenTickets: "jira:getMyOpenTickets",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -25,4 +32,5 @@ export interface OgarApi {
   setSetting(key: string, value: string): Promise<void>;
   getSecret(key: string): Promise<string | null>;
   setSecret(key: string, value: string): Promise<void>;
+  getMyOpenTickets(): Promise<JiraTicket[]>;
 }
