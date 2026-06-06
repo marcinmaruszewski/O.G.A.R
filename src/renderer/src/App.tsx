@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { PomodoroTimer } from "@/components/PomodoroTimer";
 import type { AppInfo, JiraTicket, JiraTransition } from "../../shared/ipc";
 
 export default function App(): JSX.Element {
@@ -10,6 +11,7 @@ export default function App(): JSX.Element {
   const [transitions, setTransitions] = useState<JiraTransition[] | null>(null);
   const [transitionError, setTransitionError] = useState<string | null>(null);
   const [applyingTransition, setApplyingTransition] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
 
   const loadTransitions = useCallback(async (ticketKey: string) => {
     setTransitions(null);
@@ -123,6 +125,12 @@ export default function App(): JSX.Element {
           </div>
         </div>
       )}
+
+      <PomodoroTimer
+        activeTicket={activeTicket}
+        today={today}
+        onSessionRecorded={() => void load()}
+      />
 
       {tickets !== null && (
         <div className="w-full max-w-lg">

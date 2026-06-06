@@ -40,7 +40,7 @@ describe("registerIpcHandlers", () => {
 
     const handler = handlers.get(IPC.getAppInfo);
     expect(handler).toBeDefined();
-    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 5 });
+    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 6 });
     db.close();
   });
 
@@ -422,6 +422,53 @@ describe("registerIpcHandlers", () => {
     expect(handler).toBeDefined();
     const result = await handler!(_event);
     expect(result).toEqual([{ key: "PROJ-1", id: "10001", summary: "Fix login bug" }]);
+    db.close();
+  });
+
+  it("pomodoro:recordSession persists a work session and returns its id", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    const handler = handlers.get(IPC.recordWorkSession);
+    expect(handler).toBeDefined();
+    const id = handler!(_event, {
+      ticketKey: "PROJ-42",
+      startedAt: "2026-06-06T09:00:00.000Z",
+      endedAt: "2026-06-06T09:25:00.000Z",
+    });
+    expect(typeof id).toBe("number");
+    expect(id as number).toBeGreaterThan(0);
+    db.close();
+  });
+
+  it("pomodoro:listTodaySessions returns sessions for the given date", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.recordWorkSession)!(_event, {
+      ticketKey: "PROJ-1",
+      startedAt: "2026-06-06T09:00:00.000Z",
+      endedAt: "2026-06-06T09:25:00.000Z",
+    });
+
+    const sessions = handlers.get(IPC.listTodaySessions)!(_event, "2026-06-06") as Array<{ ticketKey: string }>;
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.ticketKey).toBe("PROJ-1");
+    db.close();
+  });
+
+  it("pomodoro:sumTodaySeconds returns total elapsed seconds for today", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.recordWorkSession)!(_event, {
+      ticketKey: "PROJ-1",
+      startedAt: "2026-06-06T09:00:00.000Z",
+      endedAt: "2026-06-06T09:25:00.000Z", // 1500s
+    });
+
+    const total = handlers.get(IPC.sumTodaySeconds)!(_event, "2026-06-06") as number;
+    expect(total).toBe(1500);
     db.close();
   });
 });

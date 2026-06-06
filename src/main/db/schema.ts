@@ -55,4 +55,18 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 6,
+    name: "work_session",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE work_session (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ticket_key TEXT NOT NULL,
+          started_at TEXT NOT NULL,
+          ended_at TEXT NOT NULL
+        )
+      `);
+    },
+  },
 ];

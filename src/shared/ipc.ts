@@ -20,6 +20,19 @@ export interface JiraTransition {
   name: string;
 }
 
+export interface WorkSession {
+  id: number;
+  ticketKey: string;
+  startedAt: string;
+  endedAt: string;
+}
+
+export interface RecordWorkSessionInput {
+  ticketKey: string;
+  startedAt: string;
+  endedAt: string;
+}
+
 export type WorklogDraftStatus = "pending" | "submitted" | "skipped" | "confirmed" | "failed";
 
 export interface WorklogDraft {
@@ -57,6 +70,9 @@ export const IPC = {
   createWorklogDraft: "worklog:createDraft",
   listWorklogDrafts: "worklog:listDrafts",
   submitWorklogDraft: "worklog:submitDraft",
+  recordWorkSession: "pomodoro:recordSession",
+  listTodaySessions: "pomodoro:listTodaySessions",
+  sumTodaySeconds: "pomodoro:sumTodaySeconds",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -74,4 +90,7 @@ export interface OgarApi {
   createWorklogDraft(input: CreateWorklogDraftInput): Promise<number>;
   listWorklogDrafts(status?: WorklogDraftStatus): Promise<WorklogDraft[]>;
   submitWorklogDraft(draftId: number): Promise<void>;
+  recordWorkSession(input: RecordWorkSessionInput): Promise<number>;
+  listTodaySessions(today: string): Promise<WorkSession[]>;
+  sumTodaySeconds(today: string): Promise<number>;
 }

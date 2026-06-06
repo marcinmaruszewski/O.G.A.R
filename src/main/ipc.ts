@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { IPC } from "../shared/ipc.js";
 import { readAppInfo } from "./db/database.js";
+import { listTodaySessions, recordSession, sumTodaySeconds } from "./pomodoro/work-session.js";
 import { JiraClient } from "./jira/client.js";
 import { fetchMyOpenSprintTickets } from "./jira/jira.js";
 import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js";
@@ -84,6 +85,21 @@ export function registerIpcHandlers(
   ipc.handle(IPC.listWorklogDrafts, (_e, ...args) => {
     const status = (args[0] as WorklogDraftStatus | undefined) ?? "pending";
     return listDraftsByStatus(db, status);
+  });
+
+  ipc.handle(IPC.recordWorkSession, (_e, ...args) => {
+    const input = args[0] as import("../shared/ipc.js").RecordWorkSessionInput;
+    return recordSession(db, input);
+  });
+
+  ipc.handle(IPC.listTodaySessions, (_e, ...args) => {
+    const today = args[0] as string;
+    return listTodaySessions(db, today);
+  });
+
+  ipc.handle(IPC.sumTodaySeconds, (_e, ...args) => {
+    const today = args[0] as string;
+    return sumTodaySeconds(db, today);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
