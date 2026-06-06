@@ -23,6 +23,8 @@ export const IPC = {
   getSecret: "secrets:get",
   setSecret: "secrets:set",
   getMyOpenTickets: "jira:getMyOpenTickets",
+  getActiveTicket: "jira:getActiveTicket",
+  setActiveTicket: "jira:setActiveTicket",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -33,4 +35,6 @@ export interface OgarApi {
   getSecret(key: string): Promise<string | null>;
   setSecret(key: string, value: string): Promise<void>;
   getMyOpenTickets(): Promise<JiraTicket[]>;
+  getActiveTicket(): Promise<JiraTicket | null>;
+  setActiveTicket(ticket: JiraTicket | null): Promise<void>;
 }

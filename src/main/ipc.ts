@@ -22,6 +22,18 @@ export function registerIpcHandlers(
   ipc.handle(IPC.setSetting, (_e, ...args) => setSetting(db, args[0] as string, args[1] as string));
   ipc.handle(IPC.getSecret, (_e, ...args) => secrets.get(args[0] as string));
   ipc.handle(IPC.setSecret, (_e, ...args) => secrets.set(args[0] as string, args[1] as string));
+  ipc.handle(IPC.getActiveTicket, () => {
+    const raw = getSetting(db, "activeTicket");
+    return raw ? JSON.parse(raw) : null;
+  });
+  ipc.handle(IPC.setActiveTicket, (_e, ...args) => {
+    const ticket = args[0] as import("../shared/ipc.js").JiraTicket | null;
+    if (ticket === null) {
+      setSetting(db, "activeTicket", "");
+    } else {
+      setSetting(db, "activeTicket", JSON.stringify(ticket));
+    }
+  });
   ipc.handle(IPC.getMyOpenTickets, async () => {
     const baseUrl = getSetting(db, "jiraBaseUrl");
     const email = secrets.get("jiraEmail");
