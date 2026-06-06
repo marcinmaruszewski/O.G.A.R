@@ -16,6 +16,11 @@ import {
   markSkipped,
   type WorklogDraftStatus,
 } from "./tempo/worklog-draft.js";
+import {
+  buildDraftSuggestionsForDate,
+  buildDraftSuggestionsForRange,
+  persistDraftSuggestions,
+} from "./tempo/draft-builder.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -100,6 +105,17 @@ export function registerIpcHandlers(
   ipc.handle(IPC.sumTodaySeconds, (_e, ...args) => {
     const today = args[0] as string;
     return sumTodaySeconds(db, today);
+  });
+
+  ipc.handle(IPC.buildWorklogDrafts, (_e, ...args) => {
+    const input = args[0] as import("../shared/ipc.js").BuildWorklogDraftsInput;
+    const roundToMinutes = input.roundToMinutes;
+    const suggestions = input.endDate
+      ? buildDraftSuggestionsForRange(db, input.date, input.endDate, roundToMinutes)
+      : buildDraftSuggestionsForDate(db, input.date, roundToMinutes);
+    const description = input.description ?? "Auto-generated from Pomodoro sessions";
+    const persistedIds = persistDraftSuggestions(db, suggestions, description);
+    return { suggestions, persistedIds };
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {

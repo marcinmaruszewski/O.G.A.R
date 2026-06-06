@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IPC } from "../shared/ipc.js";
 import { openDatabase } from "./db/database.js";
 import { registerIpcHandlers, type IpcRegistrar } from "./ipc.js";
+import { storeTickets } from "./jira/ticket-cache.js";
 import type { SafeStorageAdapter } from "./settings/secret-store.js";
 
 const stubCrypto = (): SafeStorageAdapter => ({
@@ -469,6 +470,56 @@ describe("registerIpcHandlers", () => {
 
     const total = handlers.get(IPC.sumTodaySeconds)!(_event, "2026-06-06") as number;
     expect(total).toBe(1500);
+    db.close();
+  });
+
+  it("buildWorklogDrafts aggregates sessions and returns suggestions + persisted ids", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok");
+
+    handlers.get(IPC.recordWorkSession)!(_event, {
+      ticketKey: "PROJ-1",
+      startedAt: "2026-06-06T09:00:00.000Z",
+      endedAt: "2026-06-06T09:20:00.000Z", // 1200s raw → 1800s rounded (15 min)
+    });
+
+    const result = handlers.get(IPC.buildWorklogDrafts)!(_event, { date: "2026-06-06" }) as {
+      suggestions: Array<{ ticketKey: string; issueId: string | null; roundedSeconds: number; rawSeconds: number }>;
+      persistedIds: number[];
+    };
+
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.suggestions[0]!.ticketKey).toBe("PROJ-1");
+    expect(result.suggestions[0]!.rawSeconds).toBe(1200);
+    expect(result.suggestions[0]!.roundedSeconds).toBe(1800);
+    expect(result.suggestions[0]!.issueId).toBeNull(); // not in ticket_cache
+    expect(result.persistedIds).toHaveLength(0); // skipped because no issueId
+    db.close();
+  });
+
+  it("buildWorklogDrafts persists drafts when ticket is in cache", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    storeTickets(db, [{ key: "PROJ-1", id: "10001", summary: "My ticket" }]);
+
+    handlers.get(IPC.recordWorkSession)!(_event, {
+      ticketKey: "PROJ-1",
+      startedAt: "2026-06-06T09:00:00.000Z",
+      endedAt: "2026-06-06T09:25:00.000Z",
+    });
+
+    const result = handlers.get(IPC.buildWorklogDrafts)!(_event, { date: "2026-06-06" }) as {
+      suggestions: Array<{ issueId: string | null }>;
+      persistedIds: number[];
+    };
+
+    expect(result.suggestions[0]!.issueId).toBe("10001");
+    expect(result.persistedIds).toHaveLength(1);
     db.close();
   });
 });

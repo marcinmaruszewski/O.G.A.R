@@ -55,6 +55,22 @@ export interface CreateWorklogDraftInput {
   description: string;
 }
 
+export interface DraftSuggestion {
+  ticketKey: string;
+  issueId: string | null;
+  roundedSeconds: number;
+  rawSeconds: number;
+  startedAt: string;
+  date: string;
+}
+
+export interface BuildWorklogDraftsInput {
+  date: string;
+  endDate?: string;
+  roundToMinutes?: number;
+  description?: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -73,6 +89,7 @@ export const IPC = {
   recordWorkSession: "pomodoro:recordSession",
   listTodaySessions: "pomodoro:listTodaySessions",
   sumTodaySeconds: "pomodoro:sumTodaySeconds",
+  buildWorklogDrafts: "worklog:buildFromSessions",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -92,5 +109,6 @@ export interface OgarApi {
   submitWorklogDraft(draftId: number): Promise<void>;
   recordWorkSession(input: RecordWorkSessionInput): Promise<number>;
   listTodaySessions(today: string): Promise<WorkSession[]>;
+  buildWorklogDrafts(input: BuildWorklogDraftsInput): Promise<{ suggestions: DraftSuggestion[]; persistedIds: number[] }>;
   sumTodaySeconds(today: string): Promise<number>;
 }
