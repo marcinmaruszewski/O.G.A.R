@@ -20,7 +20,7 @@ export interface JiraTransition {
   name: string;
 }
 
-export type WorklogDraftStatus = "pending" | "submitted";
+export type WorklogDraftStatus = "pending" | "submitted" | "skipped" | "confirmed" | "failed";
 
 export interface WorklogDraft {
   id: number;

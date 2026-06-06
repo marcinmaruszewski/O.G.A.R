@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export type WorklogDraftStatus = "pending" | "submitted";
+export type WorklogDraftStatus = "pending" | "submitted" | "skipped" | "confirmed" | "failed";
 
 export interface WorklogDraft {
   id: number;
@@ -72,4 +72,18 @@ export function markSubmitted(db: Database.Database, id: number, tempoWorklogId:
   db.prepare(
     `UPDATE worklog_draft SET status = 'submitted', tempo_worklog_id = ? WHERE id = ?`
   ).run(tempoWorklogId, id);
+}
+
+export function markSkipped(db: Database.Database, id: number): void {
+  db.prepare(`UPDATE worklog_draft SET status = 'skipped' WHERE id = ?`).run(id);
+}
+
+export function markConfirmed(db: Database.Database, id: number, tempoWorklogId: number): void {
+  db.prepare(
+    `UPDATE worklog_draft SET status = 'confirmed', tempo_worklog_id = ? WHERE id = ?`
+  ).run(tempoWorklogId, id);
+}
+
+export function markFailed(db: Database.Database, id: number): void {
+  db.prepare(`UPDATE worklog_draft SET status = 'failed' WHERE id = ?`).run(id);
 }

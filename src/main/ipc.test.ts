@@ -202,11 +202,11 @@ describe("registerIpcHandlers", () => {
     db.close();
   });
 
-  it("worklog:submitDraft posts to Tempo and marks draft submitted", async () => {
+  it("worklog:submitDraft posts to Tempo, confirms via read-back, and marks draft confirmed", async () => {
     const { handlers, registrar, db } = makeSetup(dir);
 
     let callCount = 0;
-    const fetcher = vi.fn().mockImplementation(() => {
+    const fetcher = vi.fn().mockImplementation((url: string) => {
       callCount++;
       if (callCount === 1) {
         // getMyself
@@ -216,11 +216,30 @@ describe("registerIpcHandlers", () => {
           json: () => Promise.resolve({ accountId: "acc-xyz" }),
         });
       }
-      // postWorklog
+      if (url.includes("worklogs") && callCount === 2) {
+        // pre-submit listWorklogs — no existing worklogs
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ results: [] }),
+        });
+      }
+      if (callCount === 3) {
+        // postWorklog
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ tempoWorklogId: 99 }),
+        });
+      }
+      // post-submit listWorklogs read-back — entry confirmed
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve({ tempoWorklogId: 99 }),
+        json: () =>
+          Promise.resolve({
+            results: [{ tempoWorklogId: 99, issueId: "10042", timeSpentSeconds: 3600, startDate: "2026-06-06" }],
+          }),
       });
     });
 
@@ -242,12 +261,118 @@ describe("registerIpcHandlers", () => {
 
     await handlers.get(IPC.submitWorklogDraft)!(_event, draftId);
 
-    const drafts = handlers.get(IPC.listWorklogDrafts)!(_event) as Array<{ status: string; tempoWorklogId: number }>;
-    expect(drafts).toHaveLength(0); // no pending left
+    const pending = handlers.get(IPC.listWorklogDrafts)!(_event) as Array<{ status: string }>;
+    expect(pending).toHaveLength(0);
 
-    const submitted = handlers.get(IPC.listWorklogDrafts)!(_event, "submitted") as Array<{ status: string; tempoWorklogId: number }>;
-    expect(submitted).toHaveLength(1);
-    expect(submitted[0]!.tempoWorklogId).toBe(99);
+    const confirmed = handlers.get(IPC.listWorklogDrafts)!(_event, "confirmed") as Array<{ status: string; tempoWorklogId: number }>;
+    expect(confirmed).toHaveLength(1);
+    expect(confirmed[0]!.tempoWorklogId).toBe(99);
+    db.close();
+  });
+
+  it("worklog:submitDraft marks draft skipped when duplicate already exists in Tempo", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    let callCount = 0;
+    const fetcher = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        // getMyself
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ accountId: "acc-xyz" }),
+        });
+      }
+      // pre-submit listWorklogs — duplicate already exists
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            results: [{ tempoWorklogId: 77, issueId: "10001", timeSpentSeconds: 1800, startDate: "2026-06-06" }],
+          }),
+      });
+    });
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+    handlers.get(IPC.setSecret)!(_event, "tempoToken", "tempo-tok");
+    handlers.get(IPC.setSetting)!(_event, "tempoBaseUrl", "https://api.tempo.io/4");
+
+    const draftId = handlers.get(IPC.createWorklogDraft)!(_event, {
+      ticketKey: "PROJ-1",
+      issueId: "10001",
+      timeSpentSeconds: 1800,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "Already logged",
+    }) as number;
+
+    await handlers.get(IPC.submitWorklogDraft)!(_event, draftId);
+
+    // Should only have called getMyself + one listWorklogs — no postWorklog
+    expect(callCount).toBe(2);
+
+    const pending = handlers.get(IPC.listWorklogDrafts)!(_event) as Array<{ status: string }>;
+    expect(pending).toHaveLength(0);
+
+    const skipped = handlers.get(IPC.listWorklogDrafts)!(_event, "skipped") as Array<{ status: string }>;
+    expect(skipped).toHaveLength(1);
+    db.close();
+  });
+
+  it("worklog:submitDraft marks draft failed when post-submit read-back does not confirm the entry", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    let callCount = 0;
+    const fetcher = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ accountId: "acc-xyz" }),
+        });
+      }
+      if (callCount === 2) {
+        // pre-submit — no existing
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ results: [] }) });
+      }
+      if (callCount === 3) {
+        // postWorklog succeeds
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ tempoWorklogId: 55 }),
+        });
+      }
+      // post-submit read-back — empty (not confirmed)
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ results: [] }) });
+    });
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+    handlers.get(IPC.setSecret)!(_event, "tempoToken", "tempo-tok");
+    handlers.get(IPC.setSetting)!(_event, "tempoBaseUrl", "https://api.tempo.io/4");
+
+    const draftId = handlers.get(IPC.createWorklogDraft)!(_event, {
+      ticketKey: "PROJ-1",
+      issueId: "10001",
+      timeSpentSeconds: 3600,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "Unconfirmed",
+    }) as number;
+
+    await handlers.get(IPC.submitWorklogDraft)!(_event, draftId);
+
+    const failed = handlers.get(IPC.listWorklogDrafts)!(_event, "failed") as Array<{ status: string }>;
+    expect(failed).toHaveLength(1);
     db.close();
   });
 

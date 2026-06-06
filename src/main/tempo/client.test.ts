@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { TempoClient, TempoAuthError, TempoClientError } from "./client.js";
+import { TempoClient, TempoAuthError, TempoClientError, type TempoWorklog } from "./client.js";
 
 function makeFetch(status: number, body: unknown = {}): typeof fetch {
   return vi.fn().mockResolvedValue({
@@ -70,5 +70,44 @@ describe("TempoClient.postWorklog", () => {
         description: "work",
       })
     ).rejects.toThrow(TempoClientError);
+  });
+});
+
+describe("TempoClient.listWorklogs", () => {
+  const existingWorklogs: TempoWorklog[] = [
+    { tempoWorklogId: 10, issueId: "10001", timeSpentSeconds: 3600, startDate: "2026-06-06" },
+    { tempoWorklogId: 11, issueId: "10002", timeSpentSeconds: 1800, startDate: "2026-06-06" },
+  ];
+
+  it("fetches worklogs for author+date with correct request", async () => {
+    const fetcher = makeFetch(200, { results: existingWorklogs });
+    const client = new TempoClient("secret-token", BASE, fetcher);
+
+    const results = await client.listWorklogs("abc-123", "2026-06-06");
+
+    expect(results).toEqual(existingWorklogs);
+
+    const [url, init] = (fetcher as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
+    expect(url).toContain(`${BASE}/worklogs`);
+    expect(url).toContain("authorAccountId=abc-123");
+    expect(url).toContain("from=2026-06-06");
+    expect(url).toContain("to=2026-06-06");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer secret-token");
+  });
+
+  it("returns empty array when no worklogs exist", async () => {
+    const client = new TempoClient("token", BASE, makeFetch(200, { results: [] }));
+    const results = await client.listWorklogs("abc-123", "2026-06-06");
+    expect(results).toEqual([]);
+  });
+
+  it("throws TempoAuthError on 401", async () => {
+    const client = new TempoClient("bad-token", BASE, makeFetch(401));
+    await expect(client.listWorklogs("abc-123", "2026-06-06")).rejects.toThrow(TempoAuthError);
+  });
+
+  it("throws TempoClientError on other non-ok status", async () => {
+    const client = new TempoClient("token", BASE, makeFetch(500));
+    await expect(client.listWorklogs("abc-123", "2026-06-06")).rejects.toThrow(TempoClientError);
   });
 });

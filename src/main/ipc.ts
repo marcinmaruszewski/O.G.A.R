@@ -6,10 +6,13 @@ import { fetchMyOpenSprintTickets } from "./jira/jira.js";
 import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js";
 import { getSetting, setSetting } from "./settings/settings.js";
 import { TempoClient } from "./tempo/client.js";
+import { deduplicateDrafts, verifySubmission } from "./tempo/reconciler.js";
 import {
   createDraft,
   listDraftsByStatus,
-  markSubmitted,
+  markConfirmed,
+  markFailed,
+  markSkipped,
   type WorklogDraftStatus,
 } from "./tempo/worklog-draft.js";
 
@@ -99,6 +102,15 @@ export function registerIpcHandlers(
     if (!draft) throw new Error(`Worklog draft ${draftId} not found or already submitted`);
 
     const tempoClient = new TempoClient(tempoToken, tempoBaseUrl, fetcher);
+    const date = draft.startedAt.slice(0, 10);
+
+    const existingWorklogs = await tempoClient.listWorklogs(accountId, date);
+    const { toSkip } = deduplicateDrafts([draft], existingWorklogs);
+    if (toSkip.length > 0) {
+      markSkipped(db, draftId);
+      return;
+    }
+
     const tempoWorklogId = await tempoClient.postWorklog({
       issueId: draft.issueId,
       accountId,
@@ -107,6 +119,12 @@ export function registerIpcHandlers(
       description: draft.description,
     });
 
-    markSubmitted(db, draftId, tempoWorklogId);
+    const readBack = await tempoClient.listWorklogs(accountId, date);
+    const result = verifySubmission(draft, readBack);
+    if (result === "confirmed") {
+      markConfirmed(db, draftId, tempoWorklogId);
+    } else {
+      markFailed(db, draftId);
+    }
   });
 }

@@ -24,6 +24,13 @@ export interface WorklogPayload {
   description: string;
 }
 
+export interface TempoWorklog {
+  tempoWorklogId: number;
+  issueId: string;
+  timeSpentSeconds: number;
+  startDate: string;
+}
+
 type Fetcher = typeof fetch;
 
 export class TempoClient {
@@ -57,5 +64,21 @@ export class TempoClient {
 
     const body = (await response.json()) as { tempoWorklogId: number };
     return body.tempoWorklogId;
+  }
+
+  async listWorklogs(accountId: string, date: string): Promise<TempoWorklog[]> {
+    const url = `${this.baseUrl}/worklogs?from=${date}&to=${date}&authorAccountId=${accountId}`;
+    const response = await this.fetcher(url, {
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (response.status === 401) throw new TempoAuthError();
+    if (!response.ok) throw new TempoClientError(response.status, `Tempo API error: ${response.status}`);
+
+    const body = (await response.json()) as { results: TempoWorklog[] };
+    return body.results;
   }
 }
