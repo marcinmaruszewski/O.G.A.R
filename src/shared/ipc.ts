@@ -102,6 +102,8 @@ export const IPC = {
   sumTodaySeconds: "pomodoro:sumTodaySeconds",
   buildWorklogDrafts: "worklog:buildFromSessions",
   getTicketActivity: "git:getTicketActivity",
+  getObsidianNote: "obsidian:getNote",
+  setObsidianNote: "obsidian:setNote",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -124,4 +126,6 @@ export interface OgarApi {
   buildWorklogDrafts(input: BuildWorklogDraftsInput): Promise<{ suggestions: DraftSuggestion[]; persistedIds: number[] }>;
   sumTodaySeconds(today: string): Promise<number>;
   getTicketActivity(ticketKey: string): Promise<TicketActivity>;
+  getObsidianNote(ticketKey: string): Promise<string | null>;
+  setObsidianNote(ticketKey: string, content: string): Promise<void>;
 }

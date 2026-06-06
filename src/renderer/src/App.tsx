@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { GitActivity } from "@/components/GitActivity";
+import { ObsidianNote } from "@/components/ObsidianNote";
 import type { AppInfo, JiraTicket, JiraTransition } from "../../shared/ipc";
 
 export default function App(): JSX.Element {
@@ -134,6 +135,7 @@ export default function App(): JSX.Element {
       />
 
       {activeTicket && <GitActivity ticketKey={activeTicket.key} />}
+      {activeTicket && <ObsidianNote ticketKey={activeTicket.key} />}
 
       {tickets !== null && (
         <div className="w-full max-w-lg">

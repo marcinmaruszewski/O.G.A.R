@@ -20,6 +20,8 @@ const api: OgarApi = {
   sumTodaySeconds: (today) => ipcRenderer.invoke(IPC.sumTodaySeconds, today),
   buildWorklogDrafts: (input) => ipcRenderer.invoke(IPC.buildWorklogDrafts, input),
   getTicketActivity: (ticketKey) => ipcRenderer.invoke(IPC.getTicketActivity, ticketKey),
+  getObsidianNote: (ticketKey) => ipcRenderer.invoke(IPC.getObsidianNote, ticketKey),
+  setObsidianNote: (ticketKey, content) => ipcRenderer.invoke(IPC.setObsidianNote, ticketKey, content),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

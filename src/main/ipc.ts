@@ -22,6 +22,7 @@ import {
   persistDraftSuggestions,
 } from "./tempo/draft-builder.js";
 import { readTicketActivity } from "./git/activity-reader.js";
+import { readNote, writeNote } from "./obsidian/vault-notes.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -124,6 +125,19 @@ export function registerIpcHandlers(
     const repoPath = getSetting(db, "gitRepoPath");
     if (!repoPath) throw new Error("Git repo path not configured — set gitRepoPath in settings");
     return readTicketActivity(repoPath, ticketKey);
+  });
+
+  ipc.handle(IPC.getObsidianNote, (_e, ...args) => {
+    const ticketKey = args[0] as string;
+    const vaultPath = getSetting(db, "obsidianVaultPath");
+    return readNote(vaultPath, ticketKey);
+  });
+
+  ipc.handle(IPC.setObsidianNote, (_e, ...args) => {
+    const ticketKey = args[0] as string;
+    const content = args[1] as string;
+    const vaultPath = getSetting(db, "obsidianVaultPath");
+    writeNote(vaultPath, ticketKey, content);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
