@@ -131,6 +131,41 @@ describe("JiraClient.getTransitions", () => {
   });
 });
 
+describe("JiraClient.getMyself", () => {
+  const baseUrl = "https://example.atlassian.net/rest/api/3";
+  const email = "user@example.com";
+  const token = "tok-abc123";
+
+  let fetcher: ReturnType<typeof vi.fn>;
+  let client: JiraClient;
+
+  beforeEach(() => {
+    fetcher = vi.fn();
+    client = new JiraClient(baseUrl, email, token, fetcher);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns accountId from /myself", async () => {
+    fetcher.mockResolvedValue(
+      makeResponse(200, { accountId: "5b10a2844c20165700ede21g", displayName: "Alice" })
+    );
+
+    const myself = await client.getMyself();
+
+    expect(myself.accountId).toBe("5b10a2844c20165700ede21g");
+    const [url] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${baseUrl}/myself`);
+  });
+
+  it("throws JiraAuthError on 401", async () => {
+    fetcher.mockResolvedValue(makeResponse(401, {}));
+    await expect(client.getMyself()).rejects.toThrow(JiraAuthError);
+  });
+});
+
 describe("JiraClient.applyTransition", () => {
   const baseUrl = "https://example.atlassian.net/rest/api/3";
   const email = "user@example.com";

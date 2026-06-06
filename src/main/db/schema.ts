@@ -36,4 +36,23 @@ export const migrations: Migration[] = [
       );
     },
   },
+  {
+    version: 5,
+    name: "worklog_draft",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE worklog_draft (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ticket_key TEXT NOT NULL,
+          issue_id TEXT NOT NULL,
+          time_spent_seconds INTEGER NOT NULL,
+          started_at TEXT NOT NULL,
+          description TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          tempo_worklog_id INTEGER,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        )
+      `);
+    },
+  },
 ];

@@ -12,6 +12,9 @@ const api: OgarApi = {
   setActiveTicket: (ticket) => ipcRenderer.invoke(IPC.setActiveTicket, ticket),
   getTransitions: (issueKey) => ipcRenderer.invoke(IPC.getTransitions, issueKey),
   applyTransition: (issueKey, transitionId) => ipcRenderer.invoke(IPC.applyTransition, issueKey, transitionId),
+  createWorklogDraft: (input) => ipcRenderer.invoke(IPC.createWorklogDraft, input),
+  listWorklogDrafts: (status) => ipcRenderer.invoke(IPC.listWorklogDrafts, status),
+  submitWorklogDraft: (draftId) => ipcRenderer.invoke(IPC.submitWorklogDraft, draftId),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

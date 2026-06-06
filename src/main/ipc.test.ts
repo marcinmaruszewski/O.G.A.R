@@ -40,7 +40,7 @@ describe("registerIpcHandlers", () => {
 
     const handler = handlers.get(IPC.getAppInfo);
     expect(handler).toBeDefined();
-    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 4 });
+    expect(handler!()).toEqual({ name: "O.G.A.R.", schemaVersion: 5 });
     db.close();
   });
 
@@ -162,6 +162,114 @@ describe("registerIpcHandlers", () => {
     expect(url).toContain("PROJ-1/transitions");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ transition: { id: "21" } });
+    db.close();
+  });
+
+  it("worklog:createDraft creates a draft and returns its id", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    const handler = handlers.get(IPC.createWorklogDraft);
+    expect(handler).toBeDefined();
+
+    const id = handler!(_event, {
+      ticketKey: "PROJ-42",
+      issueId: "10042",
+      timeSpentSeconds: 3600,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "Did the thing",
+    });
+    expect(typeof id).toBe("number");
+    expect(id as number).toBeGreaterThan(0);
+    db.close();
+  });
+
+  it("worklog:listDrafts returns pending drafts", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.createWorklogDraft)!(_event, {
+      ticketKey: "PROJ-1",
+      issueId: "10001",
+      timeSpentSeconds: 1800,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "A",
+    });
+
+    const drafts = handlers.get(IPC.listWorklogDrafts)!(_event) as Array<{ ticketKey: string }>;
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]!.ticketKey).toBe("PROJ-1");
+    db.close();
+  });
+
+  it("worklog:submitDraft posts to Tempo and marks draft submitted", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    let callCount = 0;
+    const fetcher = vi.fn().mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        // getMyself
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ accountId: "acc-xyz" }),
+        });
+      }
+      // postWorklog
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ tempoWorklogId: 99 }),
+      });
+    });
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+    handlers.get(IPC.setSecret)!(_event, "tempoToken", "tempo-tok");
+    handlers.get(IPC.setSetting)!(_event, "tempoBaseUrl", "https://api.tempo.io/4");
+
+    const draftId = handlers.get(IPC.createWorklogDraft)!(_event, {
+      ticketKey: "PROJ-42",
+      issueId: "10042",
+      timeSpentSeconds: 3600,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "Did the thing",
+    }) as number;
+
+    await handlers.get(IPC.submitWorklogDraft)!(_event, draftId);
+
+    const drafts = handlers.get(IPC.listWorklogDrafts)!(_event) as Array<{ status: string; tempoWorklogId: number }>;
+    expect(drafts).toHaveLength(0); // no pending left
+
+    const submitted = handlers.get(IPC.listWorklogDrafts)!(_event, "submitted") as Array<{ status: string; tempoWorklogId: number }>;
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]!.tempoWorklogId).toBe(99);
+    db.close();
+  });
+
+  it("worklog:submitDraft throws when Tempo is not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+
+    const draftId = handlers.get(IPC.createWorklogDraft)!(_event, {
+      ticketKey: "PROJ-1",
+      issueId: "10001",
+      timeSpentSeconds: 1800,
+      startedAt: "2026-06-06T09:00:00.000+0000",
+      description: "A",
+    }) as number;
+
+    await expect(handlers.get(IPC.submitWorklogDraft)!(_event, draftId)).rejects.toThrow(
+      /tempo/i
+    );
     db.close();
   });
 

@@ -72,6 +72,22 @@ export class JiraClient {
     if (!response.ok) throw new JiraClientError(response.status, `Jira API error: ${response.status}`);
   }
 
+  async getMyself(): Promise<{ accountId: string }> {
+    const url = `${this.baseUrl}/myself`;
+    const response = await this.fetcher(url, {
+      headers: {
+        Authorization: this.auth,
+        Accept: "application/json",
+      },
+    });
+
+    if (response.status === 401) throw new JiraAuthError();
+    if (!response.ok) throw new JiraClientError(response.status, `Jira API error: ${response.status}`);
+
+    const body = (await response.json()) as { accountId: string };
+    return { accountId: body.accountId };
+  }
+
   async searchIssues(jql: string): Promise<JiraIssue[]> {
     const url = `${this.baseUrl}/search?jql=${encodeURIComponent(jql)}&fields=id,key,summary`;
     const response = await this.fetcher(url, {

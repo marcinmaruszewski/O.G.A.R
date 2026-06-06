@@ -5,6 +5,13 @@ import { JiraClient } from "./jira/client.js";
 import { fetchMyOpenSprintTickets } from "./jira/jira.js";
 import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js";
 import { getSetting, setSetting } from "./settings/settings.js";
+import { TempoClient } from "./tempo/client.js";
+import {
+  createDraft,
+  listDraftsByStatus,
+  markSubmitted,
+  type WorklogDraftStatus,
+} from "./tempo/worklog-draft.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -64,5 +71,42 @@ export function registerIpcHandlers(
     const issueKey = args[0] as string;
     const transitionId = args[1] as string;
     return requireJiraClient().applyTransition(issueKey, transitionId);
+  });
+
+  ipc.handle(IPC.createWorklogDraft, (_e, ...args) => {
+    const input = args[0] as import("../shared/ipc.js").CreateWorklogDraftInput;
+    return createDraft(db, input);
+  });
+
+  ipc.handle(IPC.listWorklogDrafts, (_e, ...args) => {
+    const status = (args[0] as WorklogDraftStatus | undefined) ?? "pending";
+    return listDraftsByStatus(db, status);
+  });
+
+  ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
+    const draftId = args[0] as number;
+
+    const tempoToken = secrets.get("tempoToken");
+    const tempoBaseUrl = getSetting(db, "tempoBaseUrl");
+    if (!tempoToken || !tempoBaseUrl) {
+      throw new Error("Tempo is not configured — set tempoToken and tempoBaseUrl in settings");
+    }
+
+    const jiraClient = requireJiraClient();
+    const { accountId } = await jiraClient.getMyself();
+
+    const [draft] = listDraftsByStatus(db, "pending").filter((d) => d.id === draftId);
+    if (!draft) throw new Error(`Worklog draft ${draftId} not found or already submitted`);
+
+    const tempoClient = new TempoClient(tempoToken, tempoBaseUrl, fetcher);
+    const tempoWorklogId = await tempoClient.postWorklog({
+      issueId: draft.issueId,
+      accountId,
+      timeSpentSeconds: draft.timeSpentSeconds,
+      startedAt: draft.startedAt,
+      description: draft.description,
+    });
+
+    markSubmitted(db, draftId, tempoWorklogId);
   });
 }

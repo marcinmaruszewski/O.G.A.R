@@ -23,14 +23,14 @@ describe("openDatabase", () => {
     const db = openDatabase(dbPath);
 
     expect(existsSync(dbPath)).toBe(true);
-    expect(db.pragma("user_version", { simple: true })).toBe(4);
+    expect(db.pragma("user_version", { simple: true })).toBe(5);
     db.close();
   });
 
   it("reads the seeded app name and current schema version", () => {
     const db = openDatabase(dbPath);
 
-    expect(readAppInfo(db)).toEqual({ name: "O.G.A.R.", schemaVersion: 4 });
+    expect(readAppInfo(db)).toEqual({ name: "O.G.A.R.", schemaVersion: 5 });
     db.close();
   });
 
@@ -39,7 +39,7 @@ describe("openDatabase", () => {
 
     const db = openDatabase(dbPath);
 
-    expect(db.pragma("user_version", { simple: true })).toBe(4);
+    expect(db.pragma("user_version", { simple: true })).toBe(5);
     const metaRows = db.prepare("SELECT COUNT(*) AS n FROM meta").get() as { n: number };
     expect(metaRows.n).toBe(1);
     db.close();

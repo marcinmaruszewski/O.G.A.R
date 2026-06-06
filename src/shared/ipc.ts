@@ -20,6 +20,28 @@ export interface JiraTransition {
   name: string;
 }
 
+export type WorklogDraftStatus = "pending" | "submitted";
+
+export interface WorklogDraft {
+  id: number;
+  ticketKey: string;
+  issueId: string;
+  timeSpentSeconds: number;
+  startedAt: string;
+  description: string;
+  status: WorklogDraftStatus;
+  tempoWorklogId: number | null;
+  createdAt: string;
+}
+
+export interface CreateWorklogDraftInput {
+  ticketKey: string;
+  issueId: string;
+  timeSpentSeconds: number;
+  startedAt: string;
+  description: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -32,6 +54,9 @@ export const IPC = {
   setActiveTicket: "jira:setActiveTicket",
   getTransitions: "jira:getTransitions",
   applyTransition: "jira:applyTransition",
+  createWorklogDraft: "worklog:createDraft",
+  listWorklogDrafts: "worklog:listDrafts",
+  submitWorklogDraft: "worklog:submitDraft",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -46,4 +71,7 @@ export interface OgarApi {
   setActiveTicket(ticket: JiraTicket | null): Promise<void>;
   getTransitions(issueKey: string): Promise<JiraTransition[]>;
   applyTransition(issueKey: string, transitionId: string): Promise<void>;
+  createWorklogDraft(input: CreateWorklogDraftInput): Promise<number>;
+  listWorklogDrafts(status?: WorklogDraftStatus): Promise<WorklogDraft[]>;
+  submitWorklogDraft(draftId: number): Promise<void>;
 }
