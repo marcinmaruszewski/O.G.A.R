@@ -21,6 +21,7 @@ import {
   buildDraftSuggestionsForRange,
   persistDraftSuggestions,
 } from "./tempo/draft-builder.js";
+import { readTicketActivity } from "./git/activity-reader.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -116,6 +117,13 @@ export function registerIpcHandlers(
     const description = input.description ?? "Auto-generated from Pomodoro sessions";
     const persistedIds = persistDraftSuggestions(db, suggestions, description);
     return { suggestions, persistedIds };
+  });
+
+  ipc.handle(IPC.getTicketActivity, (_e, ...args) => {
+    const ticketKey = args[0] as string;
+    const repoPath = getSetting(db, "gitRepoPath");
+    if (!repoPath) throw new Error("Git repo path not configured — set gitRepoPath in settings");
+    return readTicketActivity(repoPath, ticketKey);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {

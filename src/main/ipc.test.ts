@@ -2,6 +2,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./git/activity-reader.js", () => ({
+  readTicketActivity: vi.fn(),
+}));
+import { readTicketActivity } from "./git/activity-reader.js";
+const mockReadTicketActivity = vi.mocked(readTicketActivity);
 import { IPC } from "../shared/ipc.js";
 import { openDatabase } from "./db/database.js";
 import { registerIpcHandlers, type IpcRegistrar } from "./ipc.js";
@@ -520,6 +526,32 @@ describe("registerIpcHandlers", () => {
 
     expect(result.suggestions[0]!.issueId).toBe("10001");
     expect(result.persistedIds).toHaveLength(1);
+    db.close();
+  });
+
+  it("git:getTicketActivity returns commits and working-tree diff for the active ticket", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.setSetting)!(_event, "gitRepoPath", "/my/repo");
+
+    const activity = {
+      commits: [{ hash: "abc1234", subject: "feat(ABC-123): add thing", diff: "diff content" }],
+      workingTreeDiff: "uncommitted diff",
+    };
+    mockReadTicketActivity.mockReturnValueOnce(activity);
+
+    const result = handlers.get(IPC.getTicketActivity)!(_event, "ABC-123");
+    expect(result).toEqual(activity);
+    expect(mockReadTicketActivity).toHaveBeenCalledWith("/my/repo", "ABC-123");
+    db.close();
+  });
+
+  it("git:getTicketActivity throws when gitRepoPath is not configured", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    expect(() => handlers.get(IPC.getTicketActivity)!(_event, "ABC-123")).toThrow(/gitRepoPath/);
     db.close();
   });
 });

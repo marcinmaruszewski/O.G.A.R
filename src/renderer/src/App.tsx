@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
+import { GitActivity } from "@/components/GitActivity";
 import type { AppInfo, JiraTicket, JiraTransition } from "../../shared/ipc";
 
 export default function App(): JSX.Element {
@@ -131,6 +132,8 @@ export default function App(): JSX.Element {
         today={today}
         onSessionRecorded={() => void load()}
       />
+
+      {activeTicket && <GitActivity ticketKey={activeTicket.key} />}
 
       {tickets !== null && (
         <div className="w-full max-w-lg">

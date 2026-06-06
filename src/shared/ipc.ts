@@ -71,6 +71,17 @@ export interface BuildWorklogDraftsInput {
   description?: string;
 }
 
+export interface GitCommit {
+  hash: string;
+  subject: string;
+  diff: string;
+}
+
+export interface TicketActivity {
+  commits: GitCommit[];
+  workingTreeDiff: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -90,6 +101,7 @@ export const IPC = {
   listTodaySessions: "pomodoro:listTodaySessions",
   sumTodaySeconds: "pomodoro:sumTodaySeconds",
   buildWorklogDrafts: "worklog:buildFromSessions",
+  getTicketActivity: "git:getTicketActivity",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -111,4 +123,5 @@ export interface OgarApi {
   listTodaySessions(today: string): Promise<WorkSession[]>;
   buildWorklogDrafts(input: BuildWorklogDraftsInput): Promise<{ suggestions: DraftSuggestion[]; persistedIds: number[] }>;
   sumTodaySeconds(today: string): Promise<number>;
+  getTicketActivity(ticketKey: string): Promise<TicketActivity>;
 }
