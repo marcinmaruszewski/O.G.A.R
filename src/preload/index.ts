@@ -10,6 +10,8 @@ const api: OgarApi = {
   getMyOpenTickets: () => ipcRenderer.invoke(IPC.getMyOpenTickets),
   getActiveTicket: () => ipcRenderer.invoke(IPC.getActiveTicket),
   setActiveTicket: (ticket) => ipcRenderer.invoke(IPC.setActiveTicket, ticket),
+  getTransitions: (issueKey) => ipcRenderer.invoke(IPC.getTransitions, issueKey),
+  applyTransition: (issueKey, transitionId) => ipcRenderer.invoke(IPC.applyTransition, issueKey, transitionId),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

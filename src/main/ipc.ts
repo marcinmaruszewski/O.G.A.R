@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { IPC } from "../shared/ipc.js";
 import { readAppInfo } from "./db/database.js";
+import { JiraClient } from "./jira/client.js";
 import { fetchMyOpenSprintTickets } from "./jira/jira.js";
 import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js";
 import { getSetting, setSetting } from "./settings/settings.js";
@@ -42,5 +43,26 @@ export function registerIpcHandlers(
       throw new Error("Jira is not configured — set jiraBaseUrl, jiraEmail, and jiraToken in settings");
     }
     return fetchMyOpenSprintTickets(baseUrl, email, token, db, fetcher);
+  });
+
+  function requireJiraClient(): JiraClient {
+    const baseUrl = getSetting(db, "jiraBaseUrl");
+    const email = secrets.get("jiraEmail");
+    const token = secrets.get("jiraToken");
+    if (!baseUrl || !email || !token) {
+      throw new Error("Jira is not configured — set jiraBaseUrl, jiraEmail, and jiraToken in settings");
+    }
+    return new JiraClient(baseUrl, email, token, fetcher);
+  }
+
+  ipc.handle(IPC.getTransitions, async (_e, ...args) => {
+    const issueKey = args[0] as string;
+    return requireJiraClient().getTransitions(issueKey);
+  });
+
+  ipc.handle(IPC.applyTransition, async (_e, ...args) => {
+    const issueKey = args[0] as string;
+    const transitionId = args[1] as string;
+    return requireJiraClient().applyTransition(issueKey, transitionId);
   });
 }

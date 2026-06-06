@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { JiraClient, JiraAuthError, JiraClientError } from "./client.js";
+import { JiraClient, JiraAuthError, JiraClientError, type JiraTransition } from "./client.js";
 
 function makeResponse(status: number, body: unknown): Response {
   return {
@@ -70,5 +70,111 @@ describe("JiraClient.searchIssues", () => {
     fetcher.mockResolvedValue(makeResponse(500, { errorMessages: ["Server error"] }));
 
     await expect(client.searchIssues("project = PROJ")).rejects.toThrow(JiraClientError);
+  });
+});
+
+describe("JiraClient.getTransitions", () => {
+  const baseUrl = "https://example.atlassian.net/rest/api/3";
+  const email = "user@example.com";
+  const token = "tok-abc123";
+  const expectedAuth = `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
+
+  let fetcher: ReturnType<typeof vi.fn>;
+  let client: JiraClient;
+
+  beforeEach(() => {
+    fetcher = vi.fn();
+    client = new JiraClient(baseUrl, email, token, fetcher);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends GET to /issue/{key}/transitions with Basic auth header", async () => {
+    fetcher.mockResolvedValue(makeResponse(200, { transitions: [] }));
+
+    await client.getTransitions("PROJ-1");
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${baseUrl}/issue/PROJ-1/transitions`);
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(expectedAuth);
+  });
+
+  it("returns JiraTransition[] parsed from the response body", async () => {
+    fetcher.mockResolvedValue(
+      makeResponse(200, {
+        transitions: [
+          { id: "21", name: "In Progress" },
+          { id: "31", name: "Done" },
+        ],
+      })
+    );
+
+    const transitions = await client.getTransitions("PROJ-1");
+
+    expect(transitions).toEqual<JiraTransition[]>([
+      { id: "21", name: "In Progress" },
+      { id: "31", name: "Done" },
+    ]);
+  });
+
+  it("throws JiraAuthError on 401", async () => {
+    fetcher.mockResolvedValue(makeResponse(401, {}));
+    await expect(client.getTransitions("PROJ-1")).rejects.toThrow(JiraAuthError);
+  });
+
+  it("throws JiraClientError on other non-2xx responses", async () => {
+    fetcher.mockResolvedValue(makeResponse(500, {}));
+    await expect(client.getTransitions("PROJ-1")).rejects.toThrow(JiraClientError);
+  });
+});
+
+describe("JiraClient.applyTransition", () => {
+  const baseUrl = "https://example.atlassian.net/rest/api/3";
+  const email = "user@example.com";
+  const token = "tok-abc123";
+  const expectedAuth = `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
+
+  let fetcher: ReturnType<typeof vi.fn>;
+  let client: JiraClient;
+
+  beforeEach(() => {
+    fetcher = vi.fn();
+    client = new JiraClient(baseUrl, email, token, fetcher);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends POST to /issue/{key}/transitions with transitionId in body", async () => {
+    fetcher.mockResolvedValue({ ok: true, status: 204 } as Response);
+
+    await client.applyTransition("PROJ-1", "21");
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${baseUrl}/issue/PROJ-1/transitions`);
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(expectedAuth);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(init.body as string)).toEqual({ transition: { id: "21" } });
+  });
+
+  it("resolves without a value on 204", async () => {
+    fetcher.mockResolvedValue({ ok: true, status: 204 } as Response);
+    await expect(client.applyTransition("PROJ-1", "21")).resolves.toBeUndefined();
+  });
+
+  it("throws JiraAuthError on 401", async () => {
+    fetcher.mockResolvedValue({ ok: false, status: 401 } as Response);
+    await expect(client.applyTransition("PROJ-1", "21")).rejects.toThrow(JiraAuthError);
+  });
+
+  it("throws JiraClientError on other non-2xx responses", async () => {
+    fetcher.mockResolvedValue({ ok: false, status: 400 } as Response);
+    await expect(client.applyTransition("PROJ-1", "21")).rejects.toThrow(JiraClientError);
   });
 });

@@ -15,6 +15,11 @@ export interface JiraTicket {
   summary: string;
 }
 
+export interface JiraTransition {
+  id: string;
+  name: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -25,6 +30,8 @@ export const IPC = {
   getMyOpenTickets: "jira:getMyOpenTickets",
   getActiveTicket: "jira:getActiveTicket",
   setActiveTicket: "jira:setActiveTicket",
+  getTransitions: "jira:getTransitions",
+  applyTransition: "jira:applyTransition",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -37,4 +44,6 @@ export interface OgarApi {
   getMyOpenTickets(): Promise<JiraTicket[]>;
   getActiveTicket(): Promise<JiraTicket | null>;
   setActiveTicket(ticket: JiraTicket | null): Promise<void>;
+  getTransitions(issueKey: string): Promise<JiraTransition[]>;
+  applyTransition(issueKey: string, transitionId: string): Promise<void>;
 }

@@ -111,6 +111,60 @@ describe("registerIpcHandlers", () => {
     setup2.db.close();
   });
 
+  it("jira:getTransitions handler returns transitions for the given issue key", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          transitions: [
+            { id: "21", name: "In Progress" },
+            { id: "31", name: "Done" },
+          ],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+
+    const handler = handlers.get(IPC.getTransitions);
+    expect(handler).toBeDefined();
+    const result = await handler!(_event, "PROJ-1");
+    expect(result).toEqual([
+      { id: "21", name: "In Progress" },
+      { id: "31", name: "Done" },
+    ]);
+    db.close();
+  });
+
+  it("jira:applyTransition handler posts the transition and resolves", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 204,
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+
+    const handler = handlers.get(IPC.applyTransition);
+    expect(handler).toBeDefined();
+    await expect(handler!(_event, "PROJ-1", "21")).resolves.toBeUndefined();
+
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("PROJ-1/transitions");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({ transition: { id: "21" } });
+    db.close();
+  });
+
   it("jira:getMyOpenTickets handler returns tickets from Jira", async () => {
     const { handlers, registrar, db } = makeSetup(dir);
     const fetcher = vi.fn().mockResolvedValue({
