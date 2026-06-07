@@ -25,6 +25,7 @@ import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
+import { buildAssistMessages } from "./assist/assist.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -194,6 +195,21 @@ export function registerIpcHandlers(
   ipc.handle(IPC.llmSetModel, (_e, ...args) => {
     const model = args[0] as string;
     setSetting(db, "llmModel", model);
+  });
+
+  ipc.handle(IPC.assistAsk, async (_e, ...args) => {
+    const extraContext = args[0] as string | undefined;
+
+    const rawTicket = getSetting(db, "activeTicket");
+    if (!rawTicket) throw new Error("No active ticket — select a ticket before asking for assist");
+
+    const ticket = JSON.parse(rawTicket) as { key: string; id: string; summary: string };
+
+    const model = getSetting(db, "llmModel");
+    if (!model) throw new Error("No LLM model selected — pick a model in settings");
+
+    const messages = buildAssistMessages(ticket, extraContext);
+    return requireLlmClient().chat(messages, { model });
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {

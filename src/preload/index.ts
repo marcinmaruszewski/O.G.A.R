@@ -29,6 +29,7 @@ const api: OgarApi = {
   llmChat: (messages, model) => ipcRenderer.invoke(IPC.llmChat, messages, model),
   llmGetModel: () => ipcRenderer.invoke(IPC.llmGetModel),
   llmSetModel: (model) => ipcRenderer.invoke(IPC.llmSetModel, model),
+  assistAsk: (extraContext) => ipcRenderer.invoke(IPC.assistAsk, extraContext),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

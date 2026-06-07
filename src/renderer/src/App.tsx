@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { GitActivity } from "@/components/GitActivity";
 import { ObsidianNote } from "@/components/ObsidianNote";
+import { TicketAssist } from "@/components/TicketAssist";
 import type { AppInfo, JiraTicket, JiraTransition } from "../../shared/ipc";
 
 export default function App(): JSX.Element {
@@ -134,6 +135,7 @@ export default function App(): JSX.Element {
         onSessionRecorded={() => void load()}
       />
 
+      {activeTicket && <TicketAssist activeTicket={activeTicket} />}
       {activeTicket && <GitActivity ticketKey={activeTicket.key} />}
       {activeTicket && <ObsidianNote ticketKey={activeTicket.key} />}
 

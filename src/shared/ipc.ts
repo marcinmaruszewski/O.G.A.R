@@ -136,6 +136,7 @@ export const IPC = {
   llmChat: "llm:chat",
   llmGetModel: "llm:getModel",
   llmSetModel: "llm:setModel",
+  assistAsk: "assist:ask",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -167,4 +168,5 @@ export interface OgarApi {
   llmChat(messages: ChatMessage[], model: string): Promise<ChatResponse>;
   llmGetModel(): Promise<string | null>;
   llmSetModel(model: string): Promise<void>;
+  assistAsk(extraContext?: string): Promise<ChatResponse>;
 }

@@ -690,6 +690,79 @@ describe("registerIpcHandlers", () => {
     db.close();
   });
 
+  it("assist:ask sends active ticket fields to LLM and returns response", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Start by reading the ticket description." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    const ticket = { key: "PROJ-42", id: "10042", summary: "Implement login flow" };
+    handlers.get(IPC.setActiveTicket)!(_event, ticket);
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    const result = await handlers.get(IPC.assistAsk)!(_event) as { content: string };
+    expect(result.content).toBe("Start by reading the ticket description.");
+
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/v1/chat/completions");
+    const body = JSON.parse(init.body as string) as { model: string; messages: Array<{ role: string; content: string }> };
+    expect(body.model).toBe("llama3:latest");
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("PROJ-42");
+    expect(userMsg?.content).toContain("Implement login flow");
+    db.close();
+  });
+
+  it("assist:ask throws when no active ticket is set", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.assistAsk)!(_event)).rejects.toThrow(/active ticket/i);
+    db.close();
+  });
+
+  it("assist:ask throws when no LLM model is selected", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-1", id: "10001", summary: "A" });
+
+    await expect(handlers.get(IPC.assistAsk)!(_event)).rejects.toThrow(/model/i);
+    db.close();
+  });
+
+  it("assist:ask includes extra context in LLM messages when provided", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "OK" } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-1", id: "10001", summary: "Login" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    await handlers.get(IPC.assistAsk)!(_event, "See ADR-005 for context.");
+
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("See ADR-005 for context.");
+    db.close();
+  });
+
   it("llm:chat sends messages to the LLM and returns assistant response", async () => {
     const { handlers, registrar, db } = makeSetup(dir);
     const fetcher = vi.fn().mockResolvedValue({
