@@ -82,6 +82,13 @@ export interface TicketActivity {
   workingTreeDiff: string;
 }
 
+export interface ConfluencePage {
+  id: string;
+  title: string;
+  spaceKey: string;
+  excerpt: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -104,6 +111,8 @@ export const IPC = {
   getTicketActivity: "git:getTicketActivity",
   getObsidianNote: "obsidian:getNote",
   setObsidianNote: "obsidian:setNote",
+  confluenceSearch: "confluence:search",
+  confluenceGetPage: "confluence:getPage",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -128,4 +137,6 @@ export interface OgarApi {
   getTicketActivity(ticketKey: string): Promise<TicketActivity>;
   getObsidianNote(ticketKey: string): Promise<string | null>;
   setObsidianNote(ticketKey: string, content: string): Promise<void>;
+  confluenceSearch(cql: string): Promise<ConfluencePage[]>;
+  confluenceGetPage(pageId: string): Promise<string>;
 }

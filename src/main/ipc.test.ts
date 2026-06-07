@@ -554,6 +554,75 @@ describe("registerIpcHandlers", () => {
     expect(() => handlers.get(IPC.getTicketActivity)!(_event, "ABC-123")).toThrow(/gitRepoPath/);
     db.close();
   });
+
+  it("confluence:search returns pages from Confluence", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          results: [
+            {
+              content: { id: "12345", title: "Design Doc" },
+              space: { key: "DEV" },
+              excerpt: "This is the design...",
+            },
+          ],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "confluenceBaseUrl", "https://example.atlassian.net");
+    handlers.get(IPC.setSecret)!(_event, "confluenceEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "confluenceToken", "tok-conf");
+
+    const result = await handlers.get(IPC.confluenceSearch)!(_event, 'space = "DEV"');
+    expect(result).toEqual([{ id: "12345", title: "Design Doc", spaceKey: "DEV", excerpt: "This is the design..." }]);
+    db.close();
+  });
+
+  it("confluence:search throws when Confluence is not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.confluenceSearch)!(_event, "type = page")).rejects.toThrow(/confluence/i);
+    db.close();
+  });
+
+  it("confluence:getPage returns page content", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const storageValue = "<p>Page <strong>content</strong></p>";
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          id: "12345",
+          title: "Design Doc",
+          body: { storage: { value: storageValue } },
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    handlers.get(IPC.setSetting)!(_event, "confluenceBaseUrl", "https://example.atlassian.net");
+    handlers.get(IPC.setSecret)!(_event, "confluenceEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "confluenceToken", "tok-conf");
+
+    const result = await handlers.get(IPC.confluenceGetPage)!(_event, "12345");
+    expect(result).toBe(storageValue);
+    db.close();
+  });
+
+  it("confluence:getPage throws when Confluence is not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.confluenceGetPage)!(_event, "12345")).rejects.toThrow(/confluence/i);
+    db.close();
+  });
 });
 
 const _event = {} as Electron.IpcMainInvokeEvent;

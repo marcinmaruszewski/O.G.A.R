@@ -22,6 +22,8 @@ const api: OgarApi = {
   getTicketActivity: (ticketKey) => ipcRenderer.invoke(IPC.getTicketActivity, ticketKey),
   getObsidianNote: (ticketKey) => ipcRenderer.invoke(IPC.getObsidianNote, ticketKey),
   setObsidianNote: (ticketKey, content) => ipcRenderer.invoke(IPC.setObsidianNote, ticketKey, content),
+  confluenceSearch: (cql) => ipcRenderer.invoke(IPC.confluenceSearch, cql),
+  confluenceGetPage: (pageId) => ipcRenderer.invoke(IPC.confluenceGetPage, pageId),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

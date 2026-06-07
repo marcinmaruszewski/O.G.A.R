@@ -23,6 +23,7 @@ import {
 } from "./tempo/draft-builder.js";
 import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
+import { ConfluenceClient } from "./confluence/client.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -138,6 +139,26 @@ export function registerIpcHandlers(
     const content = args[1] as string;
     const vaultPath = getSetting(db, "obsidianVaultPath");
     writeNote(vaultPath, ticketKey, content);
+  });
+
+  function requireConfluenceClient(): ConfluenceClient {
+    const baseUrl = getSetting(db, "confluenceBaseUrl");
+    const email = secrets.get("confluenceEmail");
+    const token = secrets.get("confluenceToken");
+    if (!baseUrl || !email || !token) {
+      throw new Error("Confluence is not configured — set confluenceBaseUrl, confluenceEmail, and confluenceToken in settings");
+    }
+    return new ConfluenceClient(baseUrl, email, token, fetcher);
+  }
+
+  ipc.handle(IPC.confluenceSearch, async (_e, ...args) => {
+    const cql = args[0] as string;
+    return requireConfluenceClient().searchPages(cql);
+  });
+
+  ipc.handle(IPC.confluenceGetPage, async (_e, ...args) => {
+    const pageId = args[0] as string;
+    return requireConfluenceClient().getPageContent(pageId);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
