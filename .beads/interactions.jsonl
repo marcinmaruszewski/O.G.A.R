@@ -13,3 +13,4 @@
 {"id":"int-f76f64c7","kind":"field_change","created_at":"2026-06-07T16:06:42.790143162Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-qg8","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-53511683","kind":"field_change","created_at":"2026-06-07T16:15:08.413880545Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-hj6","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-b8fe7358","kind":"field_change","created_at":"2026-06-07T16:28:23.395265006Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-5p9","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-53b1f0e2","kind":"field_change","created_at":"2026-06-07T16:32:59.0790387Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-dxg","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
