@@ -34,6 +34,7 @@ const api: OgarApi = {
   assistRegenerateComment: (currentDraft, tweakInstruction) => ipcRenderer.invoke(IPC.assistRegenerateComment, currentDraft, tweakInstruction),
   assistDraftWorklogDescription: (ticketKey) => ipcRenderer.invoke(IPC.assistDraftWorklogDescription, ticketKey),
   jiraPostComment: (issueKey, text) => ipcRenderer.invoke(IPC.jiraPostComment, issueKey, text),
+  tempoValidate: () => ipcRenderer.invoke(IPC.tempoValidate),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

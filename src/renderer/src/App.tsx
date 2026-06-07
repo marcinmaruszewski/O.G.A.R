@@ -4,9 +4,13 @@ import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { GitActivity } from "@/components/GitActivity";
 import { ObsidianNote } from "@/components/ObsidianNote";
 import { TicketAssist } from "@/components/TicketAssist";
+import { SettingsTab } from "@/components/SettingsTab";
 import type { AppInfo, JiraTicket, JiraTransition } from "../../shared/ipc";
 
+type Tab = "main" | "settings";
+
 export default function App(): JSX.Element {
+  const [tab, setTab] = useState<Tab>("main");
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [tickets, setTickets] = useState<JiraTicket[] | null>(null);
   const [activeTicket, setActiveTicket] = useState<JiraTicket | null>(null);
@@ -75,8 +79,28 @@ export default function App(): JSX.Element {
   }, [loadTransitions]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background text-foreground">
-      <h1 className="text-4xl font-bold tracking-tight">{info?.name ?? "Loading…"}</h1>
+    <div className="flex min-h-screen flex-col items-center gap-6 bg-background text-foreground pt-8">
+      <div className="flex w-full max-w-lg items-center justify-between">
+        <h1 className="text-4xl font-bold tracking-tight">{info?.name ?? "Loading…"}</h1>
+        <nav className="flex gap-1 rounded-md border border-border p-1 text-sm">
+          <button
+            onClick={() => setTab("main")}
+            className={`rounded px-3 py-1 transition-colors ${tab === "main" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Main
+          </button>
+          <button
+            onClick={() => setTab("settings")}
+            className={`rounded px-3 py-1 transition-colors ${tab === "settings" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+          >
+            Settings
+          </button>
+        </nav>
+      </div>
+
+      {tab === "settings" && <SettingsTab />}
+
+      {tab === "main" && (<>
       <p className="text-muted-foreground">
         {error
           ? `Error: ${error}`
@@ -178,6 +202,7 @@ export default function App(): JSX.Element {
       )}
 
       <Button onClick={() => void load()}>Refresh</Button>
+      </>)}
     </div>
   );
 }

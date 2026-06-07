@@ -366,4 +366,22 @@ export function registerIpcHandlers(
       markFailed(db, draftId);
     }
   });
+
+  ipc.handle(IPC.tempoValidate, async () => {
+    const token = secrets.get("tempoToken");
+    const baseUrl = getSetting(db, "tempoBaseUrl");
+    if (!token || !baseUrl) {
+      return { ok: false, error: "Tempo not configured — save tempoBaseUrl and tempoToken first" };
+    }
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const res = await (fetcher ?? fetch)(`${baseUrl}/worklogs?from=${today}&to=${today}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      if (res.status === 401) return { ok: false, error: "Tempo authentication failed — check token" };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  });
 }

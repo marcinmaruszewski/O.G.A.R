@@ -141,6 +141,7 @@ export const IPC = {
   assistRegenerateComment: "assist:regenerateComment",
   assistDraftWorklogDescription: "assist:draftWorklogDescription",
   jiraPostComment: "jira:postComment",
+  tempoValidate: "tempo:validate",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -177,4 +178,5 @@ export interface OgarApi {
   assistRegenerateComment(currentDraft: string, tweakInstruction: string): Promise<ChatResponse>;
   assistDraftWorklogDescription(ticketKey: string): Promise<ChatResponse>;
   jiraPostComment(issueKey: string, text: string): Promise<void>;
+  tempoValidate(): Promise<{ ok: boolean; error?: string }>;
 }
