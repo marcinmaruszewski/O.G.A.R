@@ -24,6 +24,11 @@ const api: OgarApi = {
   setObsidianNote: (ticketKey, content) => ipcRenderer.invoke(IPC.setObsidianNote, ticketKey, content),
   confluenceSearch: (cql) => ipcRenderer.invoke(IPC.confluenceSearch, cql),
   confluenceGetPage: (pageId) => ipcRenderer.invoke(IPC.confluenceGetPage, pageId),
+  llmHealth: () => ipcRenderer.invoke(IPC.llmHealth),
+  llmListModels: () => ipcRenderer.invoke(IPC.llmListModels),
+  llmChat: (messages, model) => ipcRenderer.invoke(IPC.llmChat, messages, model),
+  llmGetModel: () => ipcRenderer.invoke(IPC.llmGetModel),
+  llmSetModel: (model) => ipcRenderer.invoke(IPC.llmSetModel, model),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

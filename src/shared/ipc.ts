@@ -89,6 +89,24 @@ export interface ConfluencePage {
   excerpt: string;
 }
 
+export interface LlmModel {
+  id: string;
+}
+
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface ChatResponse {
+  content: string;
+}
+
+export interface LlmHealth {
+  reachable: boolean;
+  error?: string;
+}
+
 /** Channel names. Keep stable; the preload and main process both reference these. */
 export const IPC = {
   getAppInfo: "app:getInfo",
@@ -113,6 +131,11 @@ export const IPC = {
   setObsidianNote: "obsidian:setNote",
   confluenceSearch: "confluence:search",
   confluenceGetPage: "confluence:getPage",
+  llmHealth: "llm:health",
+  llmListModels: "llm:listModels",
+  llmChat: "llm:chat",
+  llmGetModel: "llm:getModel",
+  llmSetModel: "llm:setModel",
 } as const;
 
 /** The typed surface exposed to the renderer via contextBridge as `window.ogar`. */
@@ -139,4 +162,9 @@ export interface OgarApi {
   setObsidianNote(ticketKey: string, content: string): Promise<void>;
   confluenceSearch(cql: string): Promise<ConfluencePage[]>;
   confluenceGetPage(pageId: string): Promise<string>;
+  llmHealth(): Promise<LlmHealth>;
+  llmListModels(): Promise<LlmModel[]>;
+  llmChat(messages: ChatMessage[], model: string): Promise<ChatResponse>;
+  llmGetModel(): Promise<string | null>;
+  llmSetModel(model: string): Promise<void>;
 }

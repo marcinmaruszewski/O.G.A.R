@@ -623,6 +623,95 @@ describe("registerIpcHandlers", () => {
     await expect(handlers.get(IPC.confluenceGetPage)!(_event, "12345")).rejects.toThrow(/confluence/i);
     db.close();
   });
+
+  it("llm:health returns reachable=true when LLM endpoint responds with models", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ object: "list", data: [{ id: "llama3:latest" }] }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setSetting)!(_event, "llmBaseUrl", "http://localhost:11434");
+
+    const result = await handlers.get(IPC.llmHealth)!(_event);
+    expect(result).toEqual({ reachable: true });
+    db.close();
+  });
+
+  it("llm:health returns reachable=false with error when LLM endpoint is unreachable", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    const result = await handlers.get(IPC.llmHealth)!(_event) as { reachable: boolean; error: string };
+    expect(result.reachable).toBe(false);
+    expect(result.error).toBeTruthy();
+    db.close();
+  });
+
+  it("llm:listModels returns model list from the LLM endpoint", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          object: "list",
+          data: [{ id: "llama3:latest", object: "model" }, { id: "mistral:7b", object: "model" }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    const models = await handlers.get(IPC.llmListModels)!(_event) as Array<{ id: string }>;
+    expect(models).toEqual([{ id: "llama3:latest" }, { id: "mistral:7b" }]);
+    db.close();
+  });
+
+  it("llm:getModel returns null when no model is selected", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    const model = handlers.get(IPC.llmGetModel)!(_event);
+    expect(model).toBeNull();
+    db.close();
+  });
+
+  it("llm:setModel persists the selected model and llm:getModel returns it", () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+    const model = handlers.get(IPC.llmGetModel)!(_event);
+    expect(model).toBe("llama3:latest");
+    db.close();
+  });
+
+  it("llm:chat sends messages to the LLM and returns assistant response", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Here is your answer." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    const messages = [{ role: "user" as const, content: "What should I do?" }];
+    const result = await handlers.get(IPC.llmChat)!(_event, messages, "llama3:latest") as { content: string };
+    expect(result.content).toBe("Here is your answer.");
+
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/v1/chat/completions");
+    expect(JSON.parse(init.body as string).model).toBe("llama3:latest");
+    db.close();
+  });
 });
 
 const _event = {} as Electron.IpcMainInvokeEvent;

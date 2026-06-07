@@ -24,6 +24,7 @@ import {
 import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
+import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -159,6 +160,40 @@ export function registerIpcHandlers(
   ipc.handle(IPC.confluenceGetPage, async (_e, ...args) => {
     const pageId = args[0] as string;
     return requireConfluenceClient().getPageContent(pageId);
+  });
+
+  function requireLlmClient(): LlmClient {
+    const baseUrl = getSetting(db, "llmBaseUrl") ?? "http://localhost:11434";
+    return new LlmClient(baseUrl, fetcher);
+  }
+
+  ipc.handle(IPC.llmHealth, async () => {
+    try {
+      await requireLlmClient().health();
+      return { reachable: true };
+    } catch (err) {
+      const message = err instanceof LlmEndpointUnreachableError ? err.message : "Unknown error";
+      return { reachable: false, error: message };
+    }
+  });
+
+  ipc.handle(IPC.llmListModels, async () => {
+    return requireLlmClient().listModels();
+  });
+
+  ipc.handle(IPC.llmChat, async (_e, ...args) => {
+    const messages = args[0] as import("../shared/ipc.js").ChatMessage[];
+    const model = args[1] as string;
+    return requireLlmClient().chat(messages, { model });
+  });
+
+  ipc.handle(IPC.llmGetModel, () => {
+    return getSetting(db, "llmModel");
+  });
+
+  ipc.handle(IPC.llmSetModel, (_e, ...args) => {
+    const model = args[0] as string;
+    setSetting(db, "llmModel", model);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
