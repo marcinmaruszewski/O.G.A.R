@@ -25,7 +25,7 @@ describe("applyBudget", () => {
   it("returns input unchanged when total content fits within budget", () => {
     const input = makeInput({ confluencePages: [{ title: "ADR", content: "short content" }] });
     const result = applyBudget(input, generousBudget);
-    expect(result.confluencePages[0].content).toBe("short content");
+    expect(result.confluencePages[0]!.content).toBe("short content");
   });
 
   it("truncates a Confluence page that exceeds perConfluencePageChars", () => {
@@ -33,7 +33,7 @@ describe("applyBudget", () => {
     const input = makeInput({ confluencePages: [{ title: "Big page", content: longContent }] });
     const budget: BudgetConfig = { totalChars: 100_000, perConfluencePageChars: 100 };
     const result = applyBudget(input, budget);
-    expect(result.confluencePages[0].content.length).toBeLessThan(longContent.length);
+    expect(result.confluencePages[0]!.content.length).toBeLessThan(longContent.length);
   });
 
   it("appends a truncation notice to a truncated Confluence page", () => {
@@ -41,7 +41,7 @@ describe("applyBudget", () => {
     const input = makeInput({ confluencePages: [{ title: "Big page", content: longContent }] });
     const budget: BudgetConfig = { totalChars: 100_000, perConfluencePageChars: 100 };
     const result = applyBudget(input, budget);
-    expect(result.confluencePages[0].content).toContain("[... truncated");
+    expect(result.confluencePages[0]!.content).toContain("[... truncated");
   });
 
   it("drops Confluence pages that do not fit within totalChars after high-priority sources", () => {

@@ -8,8 +8,8 @@ vi.mock("node:child_process", () => ({
 import { execSync } from "node:child_process";
 const mockExec = vi.mocked(execSync);
 
-function execResult(stdout: string): Buffer {
-  return Buffer.from(stdout);
+function execResult(stdout: string): string {
+  return stdout;
 }
 
 describe("readTicketActivity", () => {
@@ -64,7 +64,7 @@ describe("readTicketActivity", () => {
 
     readTicketActivity("/my/repo", "PROJ-99");
 
-    const logCall = mockExec.mock.calls[0];
+    const logCall = mockExec.mock.calls[0]!;
     expect(logCall[0]).toContain("--grep=PROJ-99");
     expect(logCall[1]).toMatchObject({ cwd: "/my/repo" });
   });
@@ -76,7 +76,7 @@ describe("readTicketActivity", () => {
 
     readTicketActivity("/my/repo", "PROJ-99");
 
-    const diffCall = mockExec.mock.calls[1];
+    const diffCall = mockExec.mock.calls[1]!;
     expect(diffCall[0]).toContain("git diff");
     expect(diffCall[1]).toMatchObject({ cwd: "/my/repo" });
   });
