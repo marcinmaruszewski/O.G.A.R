@@ -30,6 +30,8 @@ const api: OgarApi = {
   llmGetModel: () => ipcRenderer.invoke(IPC.llmGetModel),
   llmSetModel: (model) => ipcRenderer.invoke(IPC.llmSetModel, model),
   assistAsk: (extraContext) => ipcRenderer.invoke(IPC.assistAsk, extraContext),
+  assistDraftComment: () => ipcRenderer.invoke(IPC.assistDraftComment),
+  jiraPostComment: (issueKey, text) => ipcRenderer.invoke(IPC.jiraPostComment, issueKey, text),
 };
 
 // With contextIsolation on, this is the only channel between renderer and main.

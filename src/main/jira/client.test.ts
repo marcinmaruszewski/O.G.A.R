@@ -166,6 +166,56 @@ describe("JiraClient.getMyself", () => {
   });
 });
 
+describe("JiraClient.postComment", () => {
+  const baseUrl = "https://example.atlassian.net/rest/api/3";
+  const email = "user@example.com";
+  const token = "tok-abc123";
+  const expectedAuth = `Basic ${Buffer.from(`${email}:${token}`).toString("base64")}`;
+
+  let fetcher: ReturnType<typeof vi.fn>;
+  let client: JiraClient;
+
+  beforeEach(() => {
+    fetcher = vi.fn();
+    client = new JiraClient(baseUrl, email, token, fetcher);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends POST to /issue/{key}/comment with ADF body wrapping plain text", async () => {
+    fetcher.mockResolvedValue({ ok: true, status: 201, json: () => Promise.resolve({ id: "10001" }) } as unknown as Response);
+
+    await client.postComment("PROJ-1", "Fixed the login issue.");
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${baseUrl}/issue/PROJ-1/comment`);
+    expect(init.method).toBe("POST");
+    expect((init.headers as Record<string, string>)["Authorization"]).toBe(expectedAuth);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    const body = JSON.parse(init.body as string);
+    expect(body.body.type).toBe("doc");
+    expect(JSON.stringify(body)).toContain("Fixed the login issue.");
+  });
+
+  it("resolves without a value on 201", async () => {
+    fetcher.mockResolvedValue({ ok: true, status: 201, json: () => Promise.resolve({ id: "10001" }) } as unknown as Response);
+    await expect(client.postComment("PROJ-1", "Done.")).resolves.toBeUndefined();
+  });
+
+  it("throws JiraAuthError on 401", async () => {
+    fetcher.mockResolvedValue({ ok: false, status: 401 } as Response);
+    await expect(client.postComment("PROJ-1", "text")).rejects.toThrow(JiraAuthError);
+  });
+
+  it("throws JiraClientError on other non-2xx responses", async () => {
+    fetcher.mockResolvedValue({ ok: false, status: 400 } as Response);
+    await expect(client.postComment("PROJ-1", "text")).rejects.toThrow(JiraClientError);
+  });
+});
+
 describe("JiraClient.applyTransition", () => {
   const baseUrl = "https://example.atlassian.net/rest/api/3";
   const email = "user@example.com";

@@ -895,6 +895,79 @@ describe("registerIpcHandlers", () => {
     db.close();
   });
 
+  it("assist:draftComment calls LLM with comment-specific prompt and returns draft text", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Fixed the login issue by refactoring the auth module." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-42", id: "10042", summary: "Implement login flow" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    const result = await handlers.get(IPC.assistDraftComment)!(_event) as { content: string };
+    expect(result.content).toBe("Fixed the login issue by refactoring the auth module.");
+
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { messages: Array<{ role: string; content: string }> };
+    const systemMsg = body.messages.find((m) => m.role === "system");
+    expect(systemMsg?.content.toLowerCase()).toContain("comment");
+    db.close();
+  });
+
+  it("assist:draftComment throws when no active ticket is set", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.assistDraftComment)!(_event)).rejects.toThrow(/active ticket/i);
+    db.close();
+  });
+
+  it("assist:draftComment throws when no LLM model is selected", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-1", id: "10001", summary: "A" });
+
+    await expect(handlers.get(IPC.assistDraftComment)!(_event)).rejects.toThrow(/model/i);
+    db.close();
+  });
+
+  it("jira:postComment calls Jira API with the comment text", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ id: "10001" }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setSetting)!(_event, "jiraBaseUrl", "https://example.atlassian.net/rest/api/3");
+    handlers.get(IPC.setSecret)!(_event, "jiraEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "jiraToken", "tok-abc");
+
+    await handlers.get(IPC.jiraPostComment)!(_event, "PROJ-42", "Work done: refactored auth.");
+
+    const [url, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("PROJ-42/comment");
+    expect(init.method).toBe("POST");
+    const body = JSON.parse(init.body as string);
+    expect(JSON.stringify(body)).toContain("Work done: refactored auth.");
+    db.close();
+  });
+
+  it("jira:postComment throws when Jira is not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.jiraPostComment)!(_event, "PROJ-1", "text")).rejects.toThrow(/jira/i);
+    db.close();
+  });
+
   it("assist:ask still works when Obsidian/Git/Confluence are not configured", async () => {
     const { handlers, registrar, db } = makeSetup(dir);
     const fetcher = vi.fn().mockResolvedValue({

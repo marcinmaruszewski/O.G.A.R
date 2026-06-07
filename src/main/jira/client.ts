@@ -88,6 +88,34 @@ export class JiraClient {
     return { accountId: body.accountId };
   }
 
+  async postComment(issueKey: string, text: string): Promise<void> {
+    const url = `${this.baseUrl}/issue/${issueKey}/comment`;
+    const body = {
+      body: {
+        type: "doc",
+        version: 1,
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text }],
+          },
+        ],
+      },
+    };
+    const response = await this.fetcher(url, {
+      method: "POST",
+      headers: {
+        Authorization: this.auth,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (response.status === 401) throw new JiraAuthError();
+    if (!response.ok) throw new JiraClientError(response.status, `Jira API error: ${response.status}`);
+  }
+
   async searchIssues(jql: string): Promise<JiraIssue[]> {
     const url = `${this.baseUrl}/search?jql=${encodeURIComponent(jql)}&fields=id,key,summary`;
     const response = await this.fetcher(url, {

@@ -25,7 +25,7 @@ import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
-import { buildAssistMessages } from "./assist/assist.js";
+import { buildAssistMessages, buildCommentMessages } from "./assist/assist.js";
 import { assembleContext } from "./context/assembler.js";
 
 export interface IpcRegistrar {
@@ -238,6 +238,50 @@ export function registerIpcHandlers(
 
     const messages = buildAssistMessages(ticket, fullContext);
     return requireLlmClient().chat(messages, { model });
+  });
+
+  ipc.handle(IPC.assistDraftComment, async () => {
+    const rawTicket = getSetting(db, "activeTicket");
+    if (!rawTicket) throw new Error("No active ticket — select a ticket before drafting a comment");
+
+    const ticket = JSON.parse(rawTicket) as { key: string; id: string; summary: string };
+
+    const model = getSetting(db, "llmModel");
+    if (!model) throw new Error("No LLM model selected — pick a model in settings");
+
+    const vaultPath = getSetting(db, "obsidianVaultPath");
+    const obsidianNote = vaultPath ? readNote(vaultPath, ticket.key) : null;
+
+    const repoPath = getSetting(db, "gitRepoPath");
+    const gitActivity = repoPath
+      ? readTicketActivity(repoPath, ticket.key)
+      : { commits: [], workingTreeDiff: "" };
+
+    const confluenceBaseUrl = getSetting(db, "confluenceBaseUrl");
+    const confluenceEmail = secrets.get("confluenceEmail");
+    const confluenceToken = secrets.get("confluenceToken");
+    let confluencePages: Array<{ title: string; content: string }> = [];
+    if (confluenceBaseUrl && confluenceEmail && confluenceToken) {
+      const client = new ConfluenceClient(confluenceBaseUrl, confluenceEmail, confluenceToken, fetcher);
+      const cql = `text ~ "${ticket.key}"`;
+      const pages = await client.searchPages(cql).catch(() => []);
+      confluencePages = await Promise.all(
+        pages.map(async (p) => ({
+          title: p.title,
+          content: await client.getPageContent(p.id).catch(() => ""),
+        }))
+      );
+    }
+
+    const assembled = assembleContext({ ticket, confluencePages, obsidianNote, gitActivity });
+    const messages = buildCommentMessages(ticket, assembled || undefined);
+    return requireLlmClient().chat(messages, { model });
+  });
+
+  ipc.handle(IPC.jiraPostComment, async (_e, ...args) => {
+    const issueKey = args[0] as string;
+    const text = args[1] as string;
+    return requireJiraClient().postComment(issueKey, text);
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
