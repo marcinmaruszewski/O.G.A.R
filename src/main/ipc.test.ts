@@ -1030,6 +1030,85 @@ describe("registerIpcHandlers", () => {
     expect(result.content).toBe("Here you go.");
     db.close();
   });
+
+  it("assist:draftWorklogDescription calls LLM with ticket + git commits and returns description", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    mockReadTicketActivity.mockReturnValue({
+      commits: [
+        { hash: "abc123", subject: "feat(PROJ-1): implement login", diff: "" },
+        { hash: "def456", subject: "fix(PROJ-1): handle edge case", diff: "" },
+      ],
+      workingTreeDiff: "",
+    });
+
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Implemented login and fixed edge case." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+
+    storeTickets(db, [{ key: "PROJ-1", id: "10001", summary: "Login feature" }]);
+    handlers.get(IPC.setSetting)!(_event, "gitRepoPath", "/some/repo");
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    const result = await handlers.get(IPC.assistDraftWorklogDescription)!(_event, "PROJ-1") as { content: string };
+    expect(result.content).toBe("Implemented login and fixed edge case.");
+
+    const chatCall = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(chatCall[1].body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("PROJ-1");
+    expect(userMsg?.content).toContain("implement login");
+    db.close();
+  });
+
+  it("assist:draftWorklogDescription works when git is not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Did some work." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    storeTickets(db, [{ key: "PROJ-1", id: "10001", summary: "A ticket" }]);
+
+    const result = await handlers.get(IPC.assistDraftWorklogDescription)!(_event, "PROJ-1") as { content: string };
+    expect(result.content).toBe("Did some work.");
+    db.close();
+  });
+
+  it("assist:draftWorklogDescription throws when no LLM model is selected", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    storeTickets(db, [{ key: "PROJ-1", id: "10001", summary: "A ticket" }]);
+
+    await expect(handlers.get(IPC.assistDraftWorklogDescription)!(_event, "PROJ-1")).rejects.toThrow(/model/i);
+    db.close();
+  });
+
+  it("assist:draftWorklogDescription throws when ticket is not found", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    await expect(handlers.get(IPC.assistDraftWorklogDescription)!(_event, "PROJ-UNKNOWN")).rejects.toThrow(/ticket/i);
+    db.close();
+  });
 });
 
 const _event = {} as Electron.IpcMainInvokeEvent;

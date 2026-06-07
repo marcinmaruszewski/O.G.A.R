@@ -25,6 +25,32 @@ export function buildCommentMessages(ticket: TicketFields, context?: string): Ch
   ];
 }
 
+export function buildWorklogDescriptionMessages(
+  ticket: TicketFields,
+  commitSubjects: string[],
+  obsidianNote?: string | null
+): ChatMessage[] {
+  const systemPrompt =
+    "You are a developer productivity assistant. Write a concise Tempo worklog description (one to two sentences) summarising what was done on this ticket. Use plain text only — no markdown, no bullet points.";
+
+  let userContent = `Ticket: ${ticket.key}\nSummary: ${ticket.summary}`;
+
+  if (commitSubjects.length > 0) {
+    userContent += `\n\nCommits:\n${commitSubjects.join("\n")}`;
+  }
+
+  if (obsidianNote) {
+    userContent += `\n\nNotes:\n${obsidianNote}`;
+  }
+
+  userContent += "\n\nWrite a worklog description for this ticket.";
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userContent },
+  ];
+}
+
 export function buildRegenerateCommentMessages(
   ticket: TicketFields,
   currentDraft: string,

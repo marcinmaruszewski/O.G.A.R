@@ -139,6 +139,7 @@ export const IPC = {
   assistAsk: "assist:ask",
   assistDraftComment: "assist:draftComment",
   assistRegenerateComment: "assist:regenerateComment",
+  assistDraftWorklogDescription: "assist:draftWorklogDescription",
   jiraPostComment: "jira:postComment",
 } as const;
 
@@ -174,5 +175,6 @@ export interface OgarApi {
   assistAsk(extraContext?: string): Promise<ChatResponse>;
   assistDraftComment(): Promise<ChatResponse>;
   assistRegenerateComment(currentDraft: string, tweakInstruction: string): Promise<ChatResponse>;
+  assistDraftWorklogDescription(ticketKey: string): Promise<ChatResponse>;
   jiraPostComment(issueKey: string, text: string): Promise<void>;
 }

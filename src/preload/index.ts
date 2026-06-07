@@ -32,6 +32,7 @@ const api: OgarApi = {
   assistAsk: (extraContext) => ipcRenderer.invoke(IPC.assistAsk, extraContext),
   assistDraftComment: () => ipcRenderer.invoke(IPC.assistDraftComment),
   assistRegenerateComment: (currentDraft, tweakInstruction) => ipcRenderer.invoke(IPC.assistRegenerateComment, currentDraft, tweakInstruction),
+  assistDraftWorklogDescription: (ticketKey) => ipcRenderer.invoke(IPC.assistDraftWorklogDescription, ticketKey),
   jiraPostComment: (issueKey, text) => ipcRenderer.invoke(IPC.jiraPostComment, issueKey, text),
 };
 

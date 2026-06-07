@@ -8,6 +8,7 @@ import { SecretStore, type SafeStorageAdapter } from "./settings/secret-store.js
 import { getSetting, setSetting } from "./settings/settings.js";
 import { TempoClient } from "./tempo/client.js";
 import { deduplicateDrafts, verifySubmission } from "./tempo/reconciler.js";
+import { getTicket } from "./jira/ticket-cache.js";
 import {
   createDraft,
   listDraftsByStatus,
@@ -25,7 +26,7 @@ import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
-import { buildAssistMessages, buildCommentMessages, buildRegenerateCommentMessages } from "./assist/assist.js";
+import { buildAssistMessages, buildCommentMessages, buildRegenerateCommentMessages, buildWorklogDescriptionMessages } from "./assist/assist.js";
 import { assembleContext } from "./context/assembler.js";
 
 export interface IpcRegistrar {
@@ -298,6 +299,30 @@ export function registerIpcHandlers(
     const issueKey = args[0] as string;
     const text = args[1] as string;
     return requireJiraClient().postComment(issueKey, text);
+  });
+
+  ipc.handle(IPC.assistDraftWorklogDescription, async (_e, ...args) => {
+    const ticketKey = args[0] as string;
+
+    const model = getSetting(db, "llmModel");
+    if (!model) throw new Error("No LLM model selected — pick a model in settings");
+
+    const cached = getTicket(db, ticketKey);
+    if (!cached) throw new Error(`Ticket ${ticketKey} not found in cache — load your tickets from Jira first`);
+
+    const ticket = { key: ticketKey, id: "", summary: cached.summary };
+
+    const repoPath = getSetting(db, "gitRepoPath");
+    const gitActivity = repoPath
+      ? readTicketActivity(repoPath, ticketKey)
+      : { commits: [], workingTreeDiff: "" };
+    const commitSubjects = gitActivity.commits.map((c) => c.subject);
+
+    const vaultPath = getSetting(db, "obsidianVaultPath");
+    const obsidianNote = vaultPath ? readNote(vaultPath, ticketKey) : null;
+
+    const messages = buildWorklogDescriptionMessages(ticket, commitSubjects, obsidianNote);
+    return requireLlmClient().chat(messages, { model });
   });
 
   ipc.handle(IPC.submitWorklogDraft, async (_e, ...args) => {
