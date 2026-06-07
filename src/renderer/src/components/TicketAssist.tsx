@@ -17,6 +17,7 @@ export function TicketAssist({ activeTicket }: Props): JSX.Element {
   const [commentPosting, setCommentPosting] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
   const [commentPosted, setCommentPosted] = useState(false);
+  const [tweakInstruction, setTweakInstruction] = useState("");
 
   const ask = async () => {
     setLoading(true);
@@ -37,9 +38,25 @@ export function TicketAssist({ activeTicket }: Props): JSX.Element {
     setCommentError(null);
     setCommentDraft(null);
     setCommentPosted(false);
+    setTweakInstruction("");
     try {
       const result = await window.ogar.assistDraftComment();
       setCommentDraft(result.content);
+    } catch (e) {
+      setCommentError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const regenerateComment = async () => {
+    if (!commentDraft) return;
+    setCommentLoading(true);
+    setCommentError(null);
+    try {
+      const result = await window.ogar.assistRegenerateComment(commentDraft, tweakInstruction);
+      setCommentDraft(result.content);
+      setTweakInstruction("");
     } catch (e) {
       setCommentError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -109,13 +126,32 @@ export function TicketAssist({ activeTicket }: Props): JSX.Element {
               rows={6}
               value={commentDraft}
               onChange={(e) => setCommentDraft(e.target.value)}
-              disabled={commentPosting}
+              disabled={commentPosting || commentLoading}
             />
             <div className="flex gap-2">
-              <Button onClick={() => void postComment()} disabled={commentPosting || !commentDraft.trim()} className="self-start">
+              <input
+                type="text"
+                className="flex-1 rounded border border-border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Tweak instruction (e.g. shorter, more formal)"
+                value={tweakInstruction}
+                onChange={(e) => setTweakInstruction(e.target.value)}
+                disabled={commentPosting || commentLoading}
+                onKeyDown={(e) => { if (e.key === "Enter" && tweakInstruction.trim()) void regenerateComment(); }}
+              />
+              <Button
+                onClick={() => void regenerateComment()}
+                disabled={commentPosting || commentLoading || !tweakInstruction.trim()}
+                variant="outline"
+                className="self-start"
+              >
+                {commentLoading ? "Regenerating…" : "Regenerate"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => void postComment()} disabled={commentPosting || commentLoading || !commentDraft.trim()} className="self-start">
                 {commentPosting ? "Posting…" : "Approve & post"}
               </Button>
-              <Button onClick={() => setCommentDraft(null)} disabled={commentPosting} variant="outline" className="self-start">
+              <Button onClick={() => setCommentDraft(null)} disabled={commentPosting || commentLoading} variant="outline" className="self-start">
                 Discard
               </Button>
             </div>

@@ -15,3 +15,4 @@
 {"id":"int-b8fe7358","kind":"field_change","created_at":"2026-06-07T16:28:23.395265006Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-5p9","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-53b1f0e2","kind":"field_change","created_at":"2026-06-07T16:32:59.0790387Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-dxg","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-b1602c3d","kind":"field_change","created_at":"2026-06-07T16:39:44.920110899Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-s55","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-408c7e0e","kind":"field_change","created_at":"2026-06-07T16:44:54.215232693Z","actor":"Marcin Maruszewski","issue_id":"o_g_a_r-8kp","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}

@@ -138,6 +138,7 @@ export const IPC = {
   llmSetModel: "llm:setModel",
   assistAsk: "assist:ask",
   assistDraftComment: "assist:draftComment",
+  assistRegenerateComment: "assist:regenerateComment",
   jiraPostComment: "jira:postComment",
 } as const;
 
@@ -172,5 +173,6 @@ export interface OgarApi {
   llmSetModel(model: string): Promise<void>;
   assistAsk(extraContext?: string): Promise<ChatResponse>;
   assistDraftComment(): Promise<ChatResponse>;
+  assistRegenerateComment(currentDraft: string, tweakInstruction: string): Promise<ChatResponse>;
   jiraPostComment(issueKey: string, text: string): Promise<void>;
 }

@@ -25,6 +25,23 @@ export function buildCommentMessages(ticket: TicketFields, context?: string): Ch
   ];
 }
 
+export function buildRegenerateCommentMessages(
+  ticket: TicketFields,
+  currentDraft: string,
+  tweakInstruction: string
+): ChatMessage[] {
+  const systemPrompt =
+    "You are a developer productivity assistant. Revise the provided Jira comment draft according to the given instruction. Return only the revised comment — plain text, no markdown, no bullet points unless natural.";
+
+  const userContent =
+    `Ticket: ${ticket.key}\nSummary: ${ticket.summary}\n\nCurrent draft:\n${currentDraft}\n\nRevision instruction: ${tweakInstruction}\n\nWrite the revised comment.`;
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userContent },
+  ];
+}
+
 export function buildAssistMessages(ticket: TicketFields, extraContext?: string): ChatMessage[] {
   const systemPrompt =
     "You are a developer productivity assistant. Given a Jira ticket, explain what needs to be done, suggest an approach, and highlight any risks or unknowns. Be concise and practical.";

@@ -25,7 +25,7 @@ import { readTicketActivity } from "./git/activity-reader.js";
 import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
-import { buildAssistMessages, buildCommentMessages } from "./assist/assist.js";
+import { buildAssistMessages, buildCommentMessages, buildRegenerateCommentMessages } from "./assist/assist.js";
 import { assembleContext } from "./context/assembler.js";
 
 export interface IpcRegistrar {
@@ -275,6 +275,22 @@ export function registerIpcHandlers(
 
     const assembled = assembleContext({ ticket, confluencePages, obsidianNote, gitActivity });
     const messages = buildCommentMessages(ticket, assembled || undefined);
+    return requireLlmClient().chat(messages, { model });
+  });
+
+  ipc.handle(IPC.assistRegenerateComment, async (_e, ...args) => {
+    const currentDraft = args[0] as string;
+    const tweakInstruction = args[1] as string;
+
+    const rawTicket = getSetting(db, "activeTicket");
+    if (!rawTicket) throw new Error("No active ticket — select a ticket before regenerating a comment");
+
+    const ticket = JSON.parse(rawTicket) as { key: string; id: string; summary: string };
+
+    const model = getSetting(db, "llmModel");
+    if (!model) throw new Error("No LLM model selected — pick a model in settings");
+
+    const messages = buildRegenerateCommentMessages(ticket, currentDraft, tweakInstruction);
     return requireLlmClient().chat(messages, { model });
   });
 

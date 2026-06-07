@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAssistMessages, buildCommentMessages } from "./assist.js";
+import { buildAssistMessages, buildCommentMessages, buildRegenerateCommentMessages } from "./assist.js";
 
 const ticket = { key: "PROJ-123", id: "10001", summary: "Implement login flow" };
 
@@ -26,6 +26,32 @@ describe("buildAssistMessages", () => {
     const messages = buildAssistMessages(ticket);
     const user = messages.find((m) => m.role === "user");
     expect(user?.content).not.toContain("Additional context:");
+  });
+});
+
+describe("buildRegenerateCommentMessages", () => {
+  it("includes the current draft in the user message", () => {
+    const messages = buildRegenerateCommentMessages(ticket, "Original draft text.", "Make it shorter.");
+    const user = messages.find((m) => m.role === "user");
+    expect(user?.content).toContain("Original draft text.");
+  });
+
+  it("includes the tweak instruction in the user message", () => {
+    const messages = buildRegenerateCommentMessages(ticket, "Some draft.", "More formal tone.");
+    const user = messages.find((m) => m.role === "user");
+    expect(user?.content).toContain("More formal tone.");
+  });
+
+  it("includes ticket key in the user message", () => {
+    const messages = buildRegenerateCommentMessages(ticket, "Draft.", "Shorter.");
+    const user = messages.find((m) => m.role === "user");
+    expect(user?.content).toContain("PROJ-123");
+  });
+
+  it("returns a system message instructing to revise a comment", () => {
+    const messages = buildRegenerateCommentMessages(ticket, "Draft.", "Shorter.");
+    const system = messages.find((m) => m.role === "system");
+    expect(system?.content.toLowerCase()).toContain("comment");
   });
 });
 

@@ -31,6 +31,7 @@ const api: OgarApi = {
   llmSetModel: (model) => ipcRenderer.invoke(IPC.llmSetModel, model),
   assistAsk: (extraContext) => ipcRenderer.invoke(IPC.assistAsk, extraContext),
   assistDraftComment: () => ipcRenderer.invoke(IPC.assistDraftComment),
+  assistRegenerateComment: (currentDraft, tweakInstruction) => ipcRenderer.invoke(IPC.assistRegenerateComment, currentDraft, tweakInstruction),
   jiraPostComment: (issueKey, text) => ipcRenderer.invoke(IPC.jiraPostComment, issueKey, text),
 };
 

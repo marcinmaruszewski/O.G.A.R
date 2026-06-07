@@ -968,6 +968,49 @@ describe("registerIpcHandlers", () => {
     db.close();
   });
 
+  it("assist:regenerateComment calls LLM with current draft and tweak instruction, returns revised draft", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Shorter revised comment." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-42", id: "10042", summary: "Implement login flow" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    const result = await handlers.get(IPC.assistRegenerateComment)!(_event, "Long draft text.", "Make it shorter.") as { content: string };
+    expect(result.content).toBe("Shorter revised comment.");
+
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("Long draft text.");
+    expect(userMsg?.content).toContain("Make it shorter.");
+    db.close();
+  });
+
+  it("assist:regenerateComment throws when no active ticket is set", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+
+    await expect(handlers.get(IPC.assistRegenerateComment)!(_event, "draft", "tweak")).rejects.toThrow(/active ticket/i);
+    db.close();
+  });
+
+  it("assist:regenerateComment throws when no LLM model is selected", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    registerIpcHandlers(registrar, db, stubCrypto());
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-1", id: "10001", summary: "A" });
+
+    await expect(handlers.get(IPC.assistRegenerateComment)!(_event, "draft", "tweak")).rejects.toThrow(/model/i);
+    db.close();
+  });
+
   it("assist:ask still works when Obsidian/Git/Confluence are not configured", async () => {
     const { handlers, registrar, db } = makeSetup(dir);
     const fetcher = vi.fn().mockResolvedValue({
