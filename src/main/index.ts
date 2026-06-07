@@ -30,6 +30,13 @@ function createWindow(): void {
   }
 }
 
+// On Linux (including WSL2) safeStorage requires a system keyring that is not
+// always present. Switching to the basic password store enables obfuscated
+// storage without requiring GNOME Keyring or KWallet.
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch("password-store", "basic");
+}
+
 app.whenReady().then(() => {
   const db = openDatabase(join(app.getPath("userData"), "ogar.db"));
   const crypto: SafeStorageAdapter = safeStorage;
