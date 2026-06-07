@@ -785,6 +785,135 @@ describe("registerIpcHandlers", () => {
     expect(JSON.parse(init.body as string).model).toBe("llama3:latest");
     db.close();
   });
+
+  it("assist:ask auto-assembles Obsidian note into context", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const vaultPath = join(dir, "vault");
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    mkdirSync(vaultPath, { recursive: true });
+    writeFileSync(join(vaultPath, "PROJ-42.md"), "Auth flow notes: use PKCE.");
+
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Done." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setSetting)!(_event, "obsidianVaultPath", vaultPath);
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-42", id: "10042", summary: "Implement login" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    await handlers.get(IPC.assistAsk)!(_event);
+
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("Auth flow notes: use PKCE.");
+    db.close();
+  });
+
+  it("assist:ask auto-assembles git activity into context", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    mockReadTicketActivity.mockReturnValueOnce({
+      commits: [{ hash: "abc123", subject: "feat: PROJ-99 add token refresh", diff: "diff --git a/auth.ts" }],
+      workingTreeDiff: "",
+    });
+
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Done." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setSetting)!(_event, "gitRepoPath", "/repo");
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-99", id: "10099", summary: "Add refresh" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    await handlers.get(IPC.assistAsk)!(_event);
+
+    const [, init] = fetcher.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("feat: PROJ-99 add token refresh");
+    db.close();
+  });
+
+  it("assist:ask auto-assembles Confluence pages into context", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+
+    const fetcher = vi.fn().mockImplementation((url: string) => {
+      if ((url as string).includes("/wiki/rest/api/search")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              results: [{ content: { id: "99", title: "Login Architecture" }, space: { key: "ENG" }, excerpt: "" }],
+            }),
+        } as unknown as Response);
+      }
+      if ((url as string).includes("/wiki/rest/api/content/99")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({ body: { storage: { value: "OAuth2 with PKCE is the chosen approach." } } }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { role: "assistant", content: "Done." } }],
+          }),
+      } as unknown as Response);
+    });
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setSetting)!(_event, "confluenceBaseUrl", "https://example.atlassian.net");
+    handlers.get(IPC.setSecret)!(_event, "confluenceEmail", "user@example.com");
+    handlers.get(IPC.setSecret)!(_event, "confluenceToken", "token123");
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-55", id: "10055", summary: "Auth design" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    await handlers.get(IPC.assistAsk)!(_event);
+
+    const llmCall = fetcher.mock.calls.find(([u]) => (u as string).includes("/v1/chat/completions")) as [string, RequestInit];
+    const body = JSON.parse(llmCall[1].body as string) as { messages: Array<{ role: string; content: string }> };
+    const userMsg = body.messages.find((m) => m.role === "user");
+    expect(userMsg?.content).toContain("Login Architecture");
+    expect(userMsg?.content).toContain("OAuth2 with PKCE is the chosen approach.");
+    db.close();
+  });
+
+  it("assist:ask still works when Obsidian/Git/Confluence are not configured", async () => {
+    const { handlers, registrar, db } = makeSetup(dir);
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          choices: [{ message: { role: "assistant", content: "Here you go." } }],
+        }),
+    } as unknown as Response);
+
+    registerIpcHandlers(registrar, db, stubCrypto(), fetcher);
+    handlers.get(IPC.setActiveTicket)!(_event, { key: "PROJ-1", id: "10001", summary: "Simple task" });
+    handlers.get(IPC.llmSetModel)!(_event, "llama3:latest");
+
+    const result = await handlers.get(IPC.assistAsk)!(_event) as { content: string };
+    expect(result.content).toBe("Here you go.");
+    db.close();
+  });
 });
 
 const _event = {} as Electron.IpcMainInvokeEvent;

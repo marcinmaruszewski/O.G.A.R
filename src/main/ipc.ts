@@ -26,6 +26,7 @@ import { readNote, writeNote } from "./obsidian/vault-notes.js";
 import { ConfluenceClient } from "./confluence/client.js";
 import { LlmClient, LlmEndpointUnreachableError } from "./llm/client.js";
 import { buildAssistMessages } from "./assist/assist.js";
+import { assembleContext } from "./context/assembler.js";
 
 export interface IpcRegistrar {
   handle(channel: string, listener: (...args: unknown[]) => unknown): void;
@@ -208,7 +209,34 @@ export function registerIpcHandlers(
     const model = getSetting(db, "llmModel");
     if (!model) throw new Error("No LLM model selected — pick a model in settings");
 
-    const messages = buildAssistMessages(ticket, extraContext);
+    const vaultPath = getSetting(db, "obsidianVaultPath");
+    const obsidianNote = vaultPath ? readNote(vaultPath, ticket.key) : null;
+
+    const repoPath = getSetting(db, "gitRepoPath");
+    const gitActivity = repoPath
+      ? readTicketActivity(repoPath, ticket.key)
+      : { commits: [], workingTreeDiff: "" };
+
+    const confluenceBaseUrl = getSetting(db, "confluenceBaseUrl");
+    const confluenceEmail = secrets.get("confluenceEmail");
+    const confluenceToken = secrets.get("confluenceToken");
+    let confluencePages: Array<{ title: string; content: string }> = [];
+    if (confluenceBaseUrl && confluenceEmail && confluenceToken) {
+      const client = new ConfluenceClient(confluenceBaseUrl, confluenceEmail, confluenceToken, fetcher);
+      const cql = `text ~ "${ticket.key}"`;
+      const pages = await client.searchPages(cql).catch(() => []);
+      confluencePages = await Promise.all(
+        pages.map(async (p) => ({
+          title: p.title,
+          content: await client.getPageContent(p.id).catch(() => ""),
+        }))
+      );
+    }
+
+    const assembled = assembleContext({ ticket, confluencePages, obsidianNote, gitActivity });
+    const fullContext = extraContext ? `${assembled}\n\n${extraContext}` : assembled;
+
+    const messages = buildAssistMessages(ticket, fullContext);
     return requireLlmClient().chat(messages, { model });
   });
 
